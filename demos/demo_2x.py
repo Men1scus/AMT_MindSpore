@@ -3,6 +3,7 @@ import cv2
 import sys
 import glob
 import torch
+import mindspore as ms
 import argparse
 import numpy as np
 import os.path as osp
@@ -101,7 +102,8 @@ else:
 
     input_path.sort()
     print(f'Loading [images] from [{input_path}], the number of images = [{len(input_path)}]')
-    inputs = [img2tensor(read(img_path)).to(device) for img_path in input_path]
+    # inputs = [img2tensor(read(img_path)).to(device) for img_path in input_path]
+    inputs = [img2tensor(read(img_path)) for img_path in input_path]
     assert len(inputs) > 1, f"The number of input should be more than one (current {len(inputs)})"
     inputs = check_dim_and_resize(inputs)
     h, w = inputs[0].shape[-2:]
@@ -125,8 +127,11 @@ network_cfg = OmegaConf.load(cfg_path).network
 network_name = network_cfg.name
 print(f'Loading [{network_name}] from [{ckpt_path}]...')
 model = build_from_cfg(network_cfg)
-ckpt = torch.load(ckpt_path)
-model.load_state_dict(ckpt['state_dict'])
+# ckpt = torch.load(ckpt_path)
+# model.load_state_dict(ckpt['state_dict'])
+param_dict = ms.load_checkpoint(ckpt_path)
+ms.load_param_into_net(model, param_dict)
+
 model = model.to(device)
 model.eval()
 

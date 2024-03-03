@@ -1,15 +1,23 @@
-import torch
-import torch.nn as nn
-
-
-class BottleneckBlock(nn.Module):
+# import torch
+# import torch.nn as nn
+import mindspore as ms
+import mindspore.nn as nn
+from mindspore import ops as ops
+import math
+# class BottleneckBlock(nn.Module):
+class BottleneckBlock(nn.Cell):
     def __init__(self, in_planes, planes, norm_fn='group', stride=1):
         super(BottleneckBlock, self).__init__()
-  
-        self.conv1 = nn.Conv2d(in_planes, planes//4, kernel_size=1, padding=0)
-        self.conv2 = nn.Conv2d(planes//4, planes//4, kernel_size=3, padding=1, stride=stride)
-        self.conv3 = nn.Conv2d(planes//4, planes, kernel_size=1, padding=0)
-        self.relu = nn.ReLU(inplace=True)
+
+        # self.conv1 = nn.Conv2d(in_planes, planes//4, kernel_size=1, padding=0)
+        # self.conv2 = nn.Conv2d(planes//4, planes//4, kernel_size=3, padding=1, stride=stride)
+        # self.conv3 = nn.Conv2d(planes//4, planes, kernel_size=1, padding=0)
+        # self.relu = nn.ReLU(inplace=True)
+
+        self.conv1 = nn.Conv2d(in_planes, planes//4, kernel_size=1, padding=0, pad_mode='pad', has_bias=True)
+        self.conv2 = nn.Conv2d(planes//4, planes//4, kernel_size=3, padding=1, stride=stride, pad_mode='pad', has_bias=True)
+        self.conv3 = nn.Conv2d(planes//4, planes, kernel_size=1, padding=0, pad_mode='pad', has_bias=True)
+        self.relu = nn.ReLU()
 
         num_groups = planes // 8
 
@@ -35,21 +43,29 @@ class BottleneckBlock(nn.Module):
                 self.norm4 = nn.InstanceNorm2d(planes)
 
         elif norm_fn == 'none':
-            self.norm1 = nn.Sequential()
-            self.norm2 = nn.Sequential()
-            self.norm3 = nn.Sequential()
+            # self.norm1 = nn.Sequential()
+            # self.norm2 = nn.Sequential()
+            # self.norm3 = nn.Sequential()
+            # if not stride == 1:
+            #     self.norm4 = nn.Sequential()
+            self.norm1 = nn.SequentialCell()
+            self.norm2 = nn.SequentialCell()
+            self.norm3 = nn.SequentialCell()
             if not stride == 1:
-                self.norm4 = nn.Sequential()
+                self.norm4 = nn.SequentialCell()
 
         if stride == 1:
             self.downsample = None
         
         else:    
-            self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm4)
+            # self.downsample = nn.SequentialCell(
+            #     nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm4)
+            self.downsample = nn.SequentialCell(
+                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride, has_bias=True, pad_mode='valid'), self.norm4)
 
 
-    def forward(self, x):
+    # def forward(self, x):
+    def construct(self, x):
         y = x
         y = self.relu(self.norm1(self.conv1(y)))
         y = self.relu(self.norm2(self.conv2(y)))
@@ -61,13 +77,17 @@ class BottleneckBlock(nn.Module):
         return self.relu(x+y)
 
 
-class ResidualBlock(nn.Module):
+# class ResidualBlock(nn.Module):
+class ResidualBlock(nn.Cell):
     def __init__(self, in_planes, planes, norm_fn='group', stride=1):
         super(ResidualBlock, self).__init__()
   
-        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, stride=stride)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1)
-        self.relu = nn.ReLU(inplace=True)
+        # self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, stride=stride)
+        # self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1)
+        # self.relu = nn.ReLU(inplace=True)
+        self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=3, padding=1, stride=stride, pad_mode='pad', has_bias=True)
+        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, padding=1, pad_mode='pad', has_bias=True)
+        self.relu = nn.ReLU()
 
         num_groups = planes // 8
 
@@ -90,20 +110,27 @@ class ResidualBlock(nn.Module):
                 self.norm3 = nn.InstanceNorm2d(planes)
 
         elif norm_fn == 'none':
-            self.norm1 = nn.Sequential()
-            self.norm2 = nn.Sequential()
+            # self.norm1 = nn.Sequential()
+            # self.norm2 = nn.Sequential()
+            # if not stride == 1:
+            #     self.norm3 = nn.Sequential()
+            self.norm1 = nn.SequentialCell()
+            self.norm2 = nn.SequentialCell()
             if not stride == 1:
-                self.norm3 = nn.Sequential()
+                self.norm3 = nn.SequentialCell()
 
         if stride == 1:
             self.downsample = None
         
         else:    
-            self.downsample = nn.Sequential(
-                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3)
+            # self.downsample = nn.Sequential(
+            #     nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride), self.norm3)
+             self.downsample = nn.SequentialCell(
+                nn.Conv2d(in_planes, planes, kernel_size=1, stride=stride, pad_mode='pad', has_bias=True), self.norm3)
 
 
-    def forward(self, x):
+    # def forward(self, x):
+    def construct(self, x):
         y = x
         y = self.relu(self.norm1(self.conv1(y)))
         y = self.relu(self.norm2(self.conv2(y)))
@@ -114,7 +141,8 @@ class ResidualBlock(nn.Module):
         return self.relu(x+y)
 
 
-class SmallEncoder(nn.Module):
+# class SmallEncoder(nn.Module):
+class SmallEncoder(nn.Cell):
     def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0):
         super(SmallEncoder, self).__init__()
         self.norm_fn = norm_fn
@@ -129,10 +157,14 @@ class SmallEncoder(nn.Module):
             self.norm1 = nn.InstanceNorm2d(32)
 
         elif self.norm_fn == 'none':
-            self.norm1 = nn.Sequential()
+            # self.norm1 = nn.Sequential()
+            self.norm1 = nn.SequentialCell()
 
-        self.conv1 = nn.Conv2d(3, 32, kernel_size=7, stride=2, padding=3)
-        self.relu1 = nn.ReLU(inplace=True)
+        # self.conv1 = nn.Conv2d(3, 32, kernel_size=7, stride=2, padding=3)
+        # self.relu1 = nn.ReLU(inplace=True)
+            
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=7, stride=2, padding=3, pad_mode='pad', has_bias=True)
+        self.relu1 = nn.ReLU()
 
         self.in_planes = 32
         self.layer1 = self._make_layer(32,  stride=1)
@@ -143,16 +175,34 @@ class SmallEncoder(nn.Module):
         if dropout > 0:
             self.dropout = nn.Dropout2d(p=dropout)
         
-        self.conv2 = nn.Conv2d(96, output_dim, kernel_size=1)
+        # self.conv2 = nn.Conv2d(96, output_dim, kernel_size=1)
+        self.conv2 = nn.Conv2d(96, output_dim, kernel_size=1, pad_mode='valid', has_bias=True)
+# Reference: https://www.mindspore.cn/docs/zh-CN/r2.2/migration_guide/sample_code.html?highlight=kaiming_normal_
+        # for m in self.modules():
+        #     if isinstance(m, nn.Conv2d):
+        #         nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+        #     elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+        #         if m.weight is not None:
+        #             nn.init.constant_(m.weight, 1)
+        #         if m.bias is not None:
+        #             nn.init.constant_(m.bias, 0)
 
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                if m.weight is not None:
-                    nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+        for _, cell in self.cells_and_names():
+            if isinstance(cell, nn.Conv2d):
+                cell.weight.set_data(ms.common.initializer.initializer(
+                    ms.common.initializer.HeNormal(negative_slope=0, mode='fan_out', nonlinearity='relu'),
+                    cell.weight.shape, cell.weight.dtype))
+            elif isinstance(cell, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+                cell.gamma.set_data(ms.common.initializer.initializer("ones", cell.gamma.shape, cell.gamma.dtype))
+                cell.beta.set_data(ms.common.initializer.initializer("zeros", cell.beta.shape, cell.beta.dtype))
+                
+            elif isinstance(cell, (nn.Dense)):
+                if cell.weight is not None:
+                    cell.weight.set_data(ms.common.initializer.initializer(
+                        ms.common.initializer.HeUniform(negative_slope=math.sqrt(5)),
+                        cell.weight.shape, cell.weight.dtype))
+                if cell.bias is not None:
+                    cell.bias.set_data(ms.common.initializer.initializer("zeros", cell.bias.shape, cell.bias.dtype))
 
     def _make_layer(self, dim, stride=1):
         layer1 = BottleneckBlock(self.in_planes, dim, self.norm_fn, stride=stride)
@@ -160,16 +210,19 @@ class SmallEncoder(nn.Module):
         layers = (layer1, layer2)
     
         self.in_planes = dim
-        return nn.Sequential(*layers)
+        # return nn.Sequential(*layers)
+        return nn.SequentialCell(*layers)
 
 
-    def forward(self, x):
+    # def forward(self, x):
+    def construct(self, x):
 
         # if input is list, combine batch dimension
         is_list = isinstance(x, tuple) or isinstance(x, list)
         if is_list:
             batch_dim = x[0].shape[0]
-            x = torch.cat(x, dim=0)
+            # x = torch.cat(x, dim=0)
+            x = ops.cat(x, axis=0)
 
         x = self.conv1(x)
         x = self.norm1(x)
@@ -184,11 +237,13 @@ class SmallEncoder(nn.Module):
             x = self.dropout(x)
 
         if is_list:
-            x = torch.split(x, [batch_dim, batch_dim], dim=0)
+            # x = torch.split(x, [batch_dim, batch_dim], dim=0)
+            x = ops.split(x, [batch_dim, batch_dim], axis=0)
 
         return x
 
-class BasicEncoder(nn.Module):
+# class BasicEncoder(nn.Module):
+class BasicEncoder(nn.Cell):
     def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0):
         super(BasicEncoder, self).__init__()
         self.norm_fn = norm_fn
@@ -203,10 +258,13 @@ class BasicEncoder(nn.Module):
             self.norm1 = nn.InstanceNorm2d(64)
 
         elif self.norm_fn == 'none':
-            self.norm1 = nn.Sequential()
+            # self.norm1 = nn.Sequential()
+            self.norm1 = nn.SequentialCell()
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
-        self.relu1 = nn.ReLU(inplace=True)
+        # self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        # self.relu1 = nn.ReLU(inplace=True)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, pad_mode='pad', has_bias=True)
+        self.relu1 = nn.ReLU() 
 
         self.in_planes = 64
         self.layer1 = self._make_layer(64,  stride=1)
@@ -214,20 +272,39 @@ class BasicEncoder(nn.Module):
         self.layer3 = self._make_layer(128, stride=2)
 
         # output convolution
-        self.conv2 = nn.Conv2d(128, output_dim, kernel_size=1)
+        # self.conv2 = nn.Conv2d(128, output_dim, kernel_size=1)
+        self.conv2 = nn.Conv2d(128, output_dim, kernel_size=1, pad_mode='valid', has_bias=True)
 
         self.dropout = None
         if dropout > 0:
             self.dropout = nn.Dropout2d(p=dropout)
 
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                if m.weight is not None:
-                    nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+            # if isinstance(m, nn.Conv2d):
+            #     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            # elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+            #     if m.weight is not None:
+            #         nn.init.constant_(m.weight, 1)
+            #     if m.bias is not None:
+            #         nn.init.constant_(m.bias, 0)
+
+            for _, cell in self.cells_and_names():
+                if isinstance(cell, nn.Conv2d):
+                    cell.weight.set_data(ms.common.initializer.initializer(
+                        ms.common.initializer.HeNormal(negative_slope=0, mode='fan_out', nonlinearity='relu'),
+                        cell.weight.shape, cell.weight.dtype))
+                    
+                elif isinstance(cell, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+                    cell.gamma.set_data(ms.common.initializer.initializer("ones", cell.gamma.shape, cell.gamma.dtype))
+                    cell.beta.set_data(ms.common.initializer.initializer("zeros", cell.beta.shape, cell.beta.dtype))
+                    
+                elif isinstance(cell, (nn.Dense)):
+                    if cell.weight is not None:
+                        cell.weight.set_data(ms.common.initializer.initializer(
+                            ms.common.initializer.HeUniform(negative_slope=math.sqrt(5)),
+                            cell.weight.shape, cell.weight.dtype))
+                    if cell.bias is not None:
+                        cell.bias.set_data(ms.common.initializer.initializer("zeros", cell.bias.shape, cell.bias.dtype))
 
     def _make_layer(self, dim, stride=1):
         layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
@@ -235,7 +312,8 @@ class BasicEncoder(nn.Module):
         layers = (layer1, layer2)
         
         self.in_planes = dim
-        return nn.Sequential(*layers)
+        # return nn.Sequential(*layers)
+        return nn.SequentialCell(*layers)
 
 
     def forward(self, x):
@@ -244,7 +322,9 @@ class BasicEncoder(nn.Module):
         is_list = isinstance(x, tuple) or isinstance(x, list)
         if is_list:
             batch_dim = x[0].shape[0]
-            x = torch.cat(x, dim=0)
+            # x = torch.cat(x, dim=0)
+            x = ops.cat(x, axis=0)
+
 
         x = self.conv1(x)
         x = self.norm1(x)
@@ -260,11 +340,12 @@ class BasicEncoder(nn.Module):
             x = self.dropout(x)
 
         if is_list:
-            x = torch.split(x, [batch_dim, batch_dim], dim=0)
-
+            # x = torch.split(x, [batch_dim, batch_dim], dim=0)
+            x = ops.split(x, [batch_dim, batch_dim], axis=0)
         return x
 
-class LargeEncoder(nn.Module):
+# class LargeEncoder(nn.Module):
+class LargeEncoder(nn.Cell):
     def __init__(self, output_dim=128, norm_fn='batch', dropout=0.0):
         super(LargeEncoder, self).__init__()
         self.norm_fn = norm_fn
@@ -281,8 +362,11 @@ class LargeEncoder(nn.Module):
         elif self.norm_fn == 'none':
             self.norm1 = nn.Sequential()
 
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
-        self.relu1 = nn.ReLU(inplace=True)
+        # self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        # self.relu1 = nn.ReLU(inplace=True)
+            
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, pad_mode='pad', has_bias=True)
+        self.relu1 = nn.ReLU()
 
         self.in_planes = 64
         self.layer1 = self._make_layer(64, stride=1)
@@ -291,20 +375,38 @@ class LargeEncoder(nn.Module):
         self.layer3_2 = self._make_layer(160, stride=1)
 
         # output convolution
-        self.conv2 = nn.Conv2d(self.in_planes, output_dim, kernel_size=1)
+        # self.conv2 = nn.Conv2d(self.in_planes, output_dim, kernel_size=1)
+        self.conv2 = nn.Conv2d(self.in_planes, output_dim, kernel_size=1, pad_mode='valid', has_bias=True)
 
         self.dropout = None
         if dropout > 0:
             self.dropout = nn.Dropout2d(p=dropout)
 
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                if m.weight is not None:
-                    nn.init.constant_(m.weight, 1)
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
+            # if isinstance(m, nn.Conv2d):
+            #     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            # elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+            #     if m.weight is not None:
+            #         nn.init.constant_(m.weight, 1)
+            #     if m.bias is not None:
+            #         nn.init.constant_(m.bias, 0)
+
+            for _, cell in self.cells_and_names():
+                if isinstance(cell, nn.Conv2d):
+                    cell.weight.set_data(ms.common.initializer.initializer(
+                        ms.common.initializer.HeNormal(negative_slope=0, mode='fan_out', nonlinearity='relu'),
+                        cell.weight.shape, cell.weight.dtype))
+                elif isinstance(cell, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
+                    cell.gamma.set_data(ms.common.initializer.initializer("ones", cell.gamma.shape, cell.gamma.dtype))
+                    cell.beta.set_data(ms.common.initializer.initializer("zeros", cell.beta.shape, cell.beta.dtype))
+                    
+                elif isinstance(cell, (nn.Dense)):
+                    if cell.weight is not None:
+                        cell.weight.set_data(ms.common.initializer.initializer(
+                            ms.common.initializer.HeUniform(negative_slope=math.sqrt(5)),
+                            cell.weight.shape, cell.weight.dtype))
+                    if cell.bias is not None:
+                        cell.bias.set_data(ms.common.initializer.initializer("zeros", cell.bias.shape, cell.bias.dtype))
 
     def _make_layer(self, dim, stride=1):
         layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
@@ -321,7 +423,9 @@ class LargeEncoder(nn.Module):
         is_list = isinstance(x, tuple) or isinstance(x, list)
         if is_list:
             batch_dim = x[0].shape[0]
-            x = torch.cat(x, dim=0)
+            # x = torch.cat(x, dim=0)
+            x = ops.cat(x, axis=0)
+            
 
         x = self.conv1(x)
         x = self.norm1(x)
@@ -338,6 +442,7 @@ class LargeEncoder(nn.Module):
             x = self.dropout(x)
 
         if is_list:
-            x = torch.split(x, [batch_dim, batch_dim], dim=0)
+            # x = torch.split(x, [batch_dim, batch_dim], dim=0)
+            x = ops.split(x, [batch_dim, batch_dim], axis=0)
 
         return x

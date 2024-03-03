@@ -3,10 +3,12 @@
 '''
 import os
 import cv2
-import torch
+# import torch
+import mindspore as ms
 import random
 import numpy as np
-from torch.utils.data import Dataset
+# from torch.utils.data import Dataset
+import mindspore.dataset as ds
 from utils.utils import read
 
 
@@ -72,7 +74,8 @@ def random_reverse_time(img0, imgt, img1, flow, p=0.5):
     return img0, imgt, img1, flow
 
 
-class Vimeo90K_Train_Dataset(Dataset):
+# class Vimeo90K_Train_Dataset(Dataset):
+class Vimeo90K_Train_Dataset:
     def __init__(self, 
                  dataset_dir='data/vimeo_triplet', 
                  flow_dir=None, 
@@ -120,16 +123,22 @@ class Vimeo90K_Train_Dataset(Dataset):
             img0, imgt, img1, flow = random_reverse_time(img0, imgt, img1, flow, p=0.5)
                 
         
-        img0 = torch.from_numpy(img0.transpose((2, 0, 1)).astype(np.float32) / 255.0)
-        imgt = torch.from_numpy(imgt.transpose((2, 0, 1)).astype(np.float32) / 255.0)
-        img1 = torch.from_numpy(img1.transpose((2, 0, 1)).astype(np.float32) / 255.0)
-        flow = torch.from_numpy(flow.transpose((2, 0, 1)).astype(np.float32))
-        embt = torch.from_numpy(np.array(1/2).reshape(1, 1, 1).astype(np.float32))
+        # img0 = torch.from_numpy(img0.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        # imgt = torch.from_numpy(imgt.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        # img1 = torch.from_numpy(img1.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        # flow = torch.from_numpy(flow.transpose((2, 0, 1)).astype(np.float32))
+        # embt = torch.from_numpy(np.array(1/2).reshape(1, 1, 1).astype(np.float32))
+        img0 = ms.Tensor.from_numpy(img0.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        imgt = ms.Tensor.from_numpy(imgt.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        img1 = ms.Tensor.from_numpy(img1.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        flow = ms.Tensor.from_numpy(flow.transpose((2, 0, 1)).astype(np.float32))
+        embt = ms.Tensor.from_numpy(np.array(1/2).reshape(1, 1, 1).astype(np.float32))
 
         return {'img0': img0.float(), 'imgt': imgt.float(), 'img1': img1.float(), 'flow': flow.float(), 'embt': embt}
 
 
-class Vimeo90K_Test_Dataset(Dataset):
+# class Vimeo90K_Test_Dataset(Dataset):
+class Vimeo90K_Test_Dataset:
     def __init__(self, dataset_dir='data/vimeo_triplet'):
         self.dataset_dir = dataset_dir
         self.img0_list = []
@@ -159,11 +168,16 @@ class Vimeo90K_Test_Dataset(Dataset):
         flow_t1 = read(self.flow_t1_list[idx])
         flow = np.concatenate((flow_t0, flow_t1), 2)
 
-        img0 = torch.from_numpy(img0.transpose((2, 0, 1)).astype(np.float32) / 255.0)
-        imgt = torch.from_numpy(imgt.transpose((2, 0, 1)).astype(np.float32) / 255.0)
-        img1 = torch.from_numpy(img1.transpose((2, 0, 1)).astype(np.float32) / 255.0)
-        flow = torch.from_numpy(flow.transpose((2, 0, 1)).astype(np.float32))
-        embt = torch.from_numpy(np.array(1/2).reshape(1, 1, 1).astype(np.float32))
+        # img0 = torch.from_numpy(img0.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        # imgt = torch.from_numpy(imgt.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        # img1 = torch.from_numpy(img1.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        # flow = torch.from_numpy(flow.transpose((2, 0, 1)).astype(np.float32))
+        # embt = torch.from_numpy(np.array(1/2).reshape(1, 1, 1).astype(np.float32))
+        img0 = ms.Tensor.from_numpy(img0.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        imgt = ms.Tensor.from_numpy(imgt.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        img1 = ms.Tensor.from_numpy(img1.transpose((2, 0, 1)).astype(np.float32) / 255.0)
+        flow = ms.Tensor.from_numpy(flow.transpose((2, 0, 1)).astype(np.float32))
+        embt = ms.Tensor.from_numpy(np.array(1/2).reshape(1, 1, 1).astype(np.float32))
         
         return {'img0': img0.float(), 
                 'imgt': imgt.float(), 

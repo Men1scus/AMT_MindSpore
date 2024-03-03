@@ -1,5 +1,8 @@
-import torch
-import torch.nn as nn
+# import torch
+# import torch.nn as nn
+import mindspore as ms
+from mindspore import nn as nn
+from mindspore import ops as ops 
 from utils.flow_utils import warp
 from networks.blocks.ifrnet import (
     convrelu, resize,
@@ -30,9 +33,12 @@ def multi_flow_combine(comb_block, img0, img1, flow0, flow1,
                             ).reshape(-1, 1, h, w) if mask is not None else None
         img_res = img_res.reshape(b, num_flows, 3, h, w
                             ).reshape(-1, 3, h, w)  if img_res is not None else 0
-        img0 = torch.stack([img0] * num_flows, 1).reshape(-1, 3, h, w)
-        img1 = torch.stack([img1] * num_flows, 1).reshape(-1, 3, h, w)
-        mean = torch.stack([mean] * num_flows, 1).reshape(-1, 1, 1, 1
+        # img0 = torch.stack([img0] * num_flows, 1).reshape(-1, 3, h, w)
+        # img1 = torch.stack([img1] * num_flows, 1).reshape(-1, 3, h, w)
+        # mean = torch.stack([mean] * num_flows, 1).reshape(-1, 1, 1, 1
+        img0 = ops.stack([img0] * num_flows, 1).reshape(-1, 3, h, w)
+        img1 = ops.stack([img1] * num_flows, 1).reshape(-1, 3, h, w)
+        mean = ops.stack([mean] * num_flows, 1).reshape(-1, 1, 1, 1
                                                     ) if mean is not None else 0
         
         img0_warp = warp(img0, flow0)
@@ -43,23 +49,36 @@ def multi_flow_combine(comb_block, img0, img1, flow0, flow1,
         return imgt_pred
 
 
-class MultiFlowDecoder(nn.Module):
+# class MultiFlowDecoder(nn.Module):
+class MultiFlowDecoder(nn.Cell):
     def __init__(self, in_ch, skip_ch, num_flows=3):
         super(MultiFlowDecoder, self).__init__()
         self.num_flows = num_flows
-        self.convblock = nn.Sequential(
+        # self.convblock = nn.Sequential(
+        #     convrelu(in_ch*3+4, in_ch*3), 
+        #     ResBlock(in_ch*3, skip_ch), 
+        #     nn.ConvTranspose2d(in_ch*3, 8*num_flows, 4, 2, 1, bias=True)
+        # )
+        self.convblock = nn.SequentialCell(
             convrelu(in_ch*3+4, in_ch*3), 
             ResBlock(in_ch*3, skip_ch), 
-            nn.ConvTranspose2d(in_ch*3, 8*num_flows, 4, 2, 1, bias=True)
+            # nn.ConvTranspose2d(in_ch*3, 8*num_flows, 4, 2, 1, bias=True)
+            nn.Conv2dTranspose(in_ch*3, 8*num_flows, kernel_size=4, stride=2, padding=1, pad_mode='pad', has_bias=True)
+            
         )
         
-    def forward(self, ft_, f0, f1, flow0, flow1):
+    # def forward(self, ft_, f0, f1, flow0, flow1):
+    def construct(self, ft_, f0, f1, flow0, flow1):
+    
         n = self.num_flows
         f0_warp = warp(f0, flow0)
         f1_warp = warp(f1, flow1)
-        out = self.convblock(torch.cat([ft_, f0_warp, f1_warp, flow0, flow1], 1))
-        delta_flow0, delta_flow1, mask, img_res = torch.split(out, [2*n, 2*n, n, 3*n], 1)
-        mask = torch.sigmoid(mask)
+        # out = self.convblock(torch.cat([ft_, f0_warp, f1_warp, flow0, flow1], 1))
+        # delta_flow0, delta_flow1, mask, img_res = torch.split(out, [2*n, 2*n, n, 3*n], 1)
+        # mask = torch.sigmoid(mask)
+        out = self.convblock(ops.cat([ft_, f0_warp, f1_warp, flow0, flow1], 1))
+        delta_flow0, delta_flow1, mask, img_res = ops.split(out, [2*n, 2*n, n, 3*n], 1)
+        mask = ops.sigmoid(mask)
         
         flow0 = delta_flow0 + 2.0 * resize(flow0, scale_factor=2.0
                                            ).repeat(1, self.num_flows, 1, 1)

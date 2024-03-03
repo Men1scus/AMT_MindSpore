@@ -5,11 +5,15 @@ import numpy as np
 import os.path as osp
 from collections import OrderedDict
 
-import torch
-from torch.optim import AdamW
-from torch.utils.data import DataLoader
-from torch.utils.data.distributed import DistributedSampler
-from torch.nn.parallel import DistributedDataParallel as DDP
+# import torch
+# from torch.optim import AdamW
+# from torch.utils.data import DataLoader
+# from torch.utils.data.distributed import DistributedSampler
+# from torch.nn.parallel import DistributedDataParallel as DDP
+import mindspore as ms
+from mindspore.nn import AdamWeightDecay
+from mindspore.dataset import GeneratorDataset, DistributedSampler
+
 
 from .logger import CustomLogger
 from utils.utils import AverageMeterGroups
@@ -26,18 +30,20 @@ class Trainer:
         self._init_dataset()
         self._init_loss()
         self.model_name = config['exp_name']
-        self.model = build_from_cfg(config.network).to(self.config.device)
-        
-        if config['distributed']:
-            self.model = DDP(self.model,
-                             device_ids=[self.rank],
-                             output_device=self.rank,
-                             broadcast_buffers=True,
-                             find_unused_parameters=False)
+        # self.model = build_from_cfg(config.network).to(self.config.device)
+        self.model = build_from_cfg(config.network)
+        # if config['distributed']:
+        #     self.model = DDP(self.model,
+        #                      device_ids=[self.rank],
+        #                      output_device=self.rank,
+        #                      broadcast_buffers=True,
+        #                      find_unused_parameters=False)
 
         init_log += str(self.model)
-        self.optimizer = AdamW(self.model.parameters(),
-                               lr=config.lr, weight_decay=config.weight_decay)
+        # self.optimizer = AdamW(self.model.parameters(),
+        #                        lr=config.lr, weight_decay=config.weight_decay)
+        self.optimizer = AdamWeightDecay(self.model.trainable_params(),
+                               learning_rate=config.lr, weight_decay=config.weight_decay)
         if self.rank == 0: 
             print(init_log) 
         self.logger(init_log)
@@ -46,7 +52,9 @@ class Trainer:
     def resume_training(self):
         ckpt_path = self.config.get('resume_state')
         if ckpt_path is not None:
-            ckpt = torch.load(self.config['resume_state'])
+            # ckpt = torch.load(self.config['resume_state'])
+            ckpt = ms.load_checkpoint(self.config['resume_state'])
+            
             if self.config['distributed']:
                 self.model.module.load_state_dict(ckpt['state_dict'])
             else:
@@ -95,16 +103,39 @@ class Trainer:
         dataset_train = build_from_cfg(self.config.data.train)
         dataset_val = build_from_cfg(self.config.data.val)
         
-        self.sampler = DistributedSampler(
-            dataset_train, num_replicas=self.config['world_size'], rank=self.config['local_rank'])
+        # self.sampler = DistributedSampler(
+        #     dataset_train, num_replicas=self.config['world_size'], rank=self.config['local_rank'])
+        self.sampler = DistributedSampler( num_shards=self.config['world_size'], shard_id=self.config['local_rank'])
         self.config.data.train_loader.batch_size //= self.config['world_size']
-        self.loader_train = DataLoader(dataset_train,
-                                       **self.config.data.train_loader,
-                                       pin_memory=True, drop_last=True, sampler=self.sampler)
 
-        self.loader_val = DataLoader(dataset_val, **self.config.data.val_loader,
-                                     pin_memory=True, shuffle=False, drop_last=False)
+        
+        # self.loader_train = DataLoader(dataset_train,
+        #                                **self.config.data.train_loader,
+        #                                pin_memory=True, drop_last=True, sampler=self.sampler)
 
+        # self.loader_val = DataLoader(dataset_val, **self.config.data.val_loader,
+        #                              pin_memory=True, shuffle=False, drop_last=False)
+# Reference: https://www.mindspore.cn/docs/zh-CN/r2.2/note/api_mapping/pytorch_diff/DataLoader.html
+        
+        self.loader_train = GeneratorDataset(dataset_train,
+                                        # **self.config.data.train_loader,
+                                        num_parallel_workers=self.config.data.train_loader.num_workers,
+                                        # pin_memory=True, MindSpore不支持
+                                        # drop_last=True,  MindSpore通过 mindspore.dataset.batch 操作支持
+                                        sampler=self.sampler, # 一致
+                                        column_names=['data']
+                                        )
+        self.loader_train = self.loader_train.batch(batch_size=self.config.data.train_loader.batch_size, drop_remainder=True)
+
+        self.loader_val = GeneratorDataset(dataset_val, 
+                                        # **self.config.data.val_loader,
+                                        num_parallel_workers=self.config.data.val_loader.num_workers,
+                                        # pin_memory=True, MindSpore不支持
+                                        # drop_last=False，MindSpore通过 mindspore.dataset.batch 操作支持
+                                        shuffle=False, # 一致
+                                        column_names=['data']
+                                        )
+        self.loader_val = self.loader_val.batch(batch_size=self.config.data.val_loader.batch_size, drop_remainder=False)
     def _init_loss(self):
         self.loss_dict = dict()
         for loss_cfg in self.config.losses:
@@ -134,7 +165,7 @@ class Trainer:
         start_t = time.time()
         total_t = 0
         for epoch in range(self.resume_epoch, self.config['epochs']):
-            self.sampler.set_epoch(epoch)
+            # self.sampler.set_epoch(epoch)
             for data in self.loader_train:
                 for k, v in data.items():
                     data[k] = v.to(self.config['device'])
@@ -145,7 +176,8 @@ class Trainer:
 
                 self.optimizer.zero_grad()
                 results = self.model(**data)
-                total_loss = torch.tensor(0., device=self.config['device'])
+                # total_loss = torch.tensor(0., device=self.config['device'])
+                total_loss = ms.Tensor(0.)
                 for name, loss in self.loss_dict.items():
                     l = loss(**results, **data)
                     loss_group.update({name: l.cpu().data})
@@ -202,13 +234,20 @@ class Trainer:
             for k, v in data.items():
                 data[k] = v.to(self.config['device'])
 
-            with torch.no_grad():
-                results = self.model(**data, eval=True)
-                imgt_pred = results['imgt_pred']
-                for j in range(data['img0'].shape[0]):
-                    psnr = calculate_psnr(imgt_pred[j].detach().unsqueeze(
-                        0), data['imgt'][j].unsqueeze(0)).cpu().data
-                    psnr_list.append(psnr)
+            # with torch.no_grad():
+            results = self.model(**data, eval=True)
+            imgt_pred = results['imgt_pred']
+            for j in range(data['img0'].shape[0]):
+                # psnr = calculate_psnr(imgt_pred[j].detach().unsqueeze(
+                #     0), data['imgt'][j].unsqueeze(0)).cpu().data
+                # psnr_list.append(psnr)
+                
+                psnr = calculate_psnr(imgt_pred[j].detach().unsqueeze(0), data['imgt'][j].unsqueeze(0))
+                # 先把numpy转换成Pytorch中的Tensor类型，才能调用.cpu()
+                # psnr_tensor = torch.from_numpy(psnr).to(self.config['device'])  # Assuming calculate_psnr returns a NumPy array
+                psnr_tensor = ms.Tensor.from_numpy(psnr).to(self.config['device'])  # Assuming calculate_psnr returns a NumPy array
+                psnr_list.append(psnr_tensor.cpu().data)  # Now calling .cpu() on a PyTorch tensor
+
 
         eval_time = time.time() - time_stamp
 
@@ -224,7 +263,8 @@ class Trainer:
         else:
             ckpt['state_dict'] = self.model.state_dict()
         ckpt['optim'] = self.optimizer.state_dict()
-        torch.save(ckpt, save_path)
+        # torch.save(ckpt, save_path)
+        ms.save_checkpoint(ckpt, save_path)
 
     def eta_format(self, eta):
         time_str = ''

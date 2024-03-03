@@ -1,10 +1,11 @@
 import os
 import sys
-import torch
+# import torch
+import mindspore as ms
 import argparse
 import numpy as np
 import os.path as osp
-import torch.nn.functional as F
+# import torch.nn.functional as F
 
 sys.path.append('.')
 from utils.utils import read, write
@@ -22,8 +23,12 @@ vimeo90k_sequences_dir = osp.join(vimeo90k_dir, 'sequences')
 vimeo90k_flow_dir = osp.join(vimeo90k_dir, 'flow')
 
 def pred_flow(img1, img2):
-    img1 = torch.from_numpy(img1).float().permute(2, 0, 1) / 255.0
-    img2 = torch.from_numpy(img2).float().permute(2, 0, 1) / 255.0
+    
+    # img1 = torch.from_numpy(img1).float().permute(2, 0, 1) / 255.0
+    # img2 = torch.from_numpy(img2).float().permute(2, 0, 1) / 255.0
+
+    img1 = ms.Tensor.from_numpy(img1).float().permute(2, 0, 1) / 255.0
+    img2 = ms.Tensor.from_numpy(img2).float().permute(2, 0, 1) / 255.0
 
     flow = estimate(img1, img2)
 

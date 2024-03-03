@@ -1,10 +1,12 @@
 import re
 import sys
-import torch
+# import torch
+import mindspore as ms
 import random
 import numpy as np
 from PIL import ImageFile
-import torch.nn.functional as F
+# import torch.nn.functional as F
+import mindspore.ops as ops
 from imageio import imread, imwrite
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -61,9 +63,11 @@ class InputPadder:
 
     def pad(self, *inputs):
         if len(inputs) == 1:
-            return F.pad(inputs[0], self._pad, mode='replicate')
+            # return F.pad(inputs[0], self._pad, mode='replicate')
+            return ops.pad(inputs[0], self._pad, mode='replicate')
         else:
-            return [F.pad(x, self._pad, mode='replicate') for x in inputs]
+            # return [F.pad(x, self._pad, mode='replicate') for x in inputs]
+            return [ops.pad(x, self._pad, mode='replicate') for x in inputs]
 
     def unpad(self, *inputs):
         if len(inputs) == 1:
@@ -80,7 +84,8 @@ class InputPadder:
 def img2tensor(img):
     if img.shape[-1] > 3:
         img = img[:,:,:3]
-    return torch.tensor(img).permute(2, 0, 1).unsqueeze(0) / 255.0
+    # return torch.tensor(img).permute(2, 0, 1).unsqueeze(0) / 255.0
+    return ms.tensor(img).permute(2, 0, 1).unsqueeze(0) / 255.0
 
 
 def tensor2img(img_t):
@@ -91,8 +96,8 @@ def tensor2img(img_t):
 def seed_all(seed):
     random.seed(seed)
     np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    # torch.manual_seed(seed)
+    # torch.cuda.manual_seed_all(seed)
 
 
 def read(file):
@@ -289,7 +294,8 @@ def check_dim_and_resize(tensor_list):
         
         resize_tensor_list = []
         for t in tensor_list:
-            resize_tensor_list.append(torch.nn.functional.interpolate(t, size=tuple(desired_shape), mode='bilinear'))
+            # resize_tensor_list.append(torch.nn.functional.interpolate(t, size=tuple(desired_shape), mode='bilinear'))
+            resize_tensor_list.append(ops.interpolate(t, size=tuple(desired_shape), mode='bilinear'))
 
         tensor_list = resize_tensor_list
 

@@ -1,8 +1,9 @@
 import os
 import argparse
 from shutil import copyfile
-import torch.distributed as dist
-import torch
+# import torch.distributed as dist
+# import torch
+import mindspore as ms
 import importlib
 import datetime
 from utils.dist_utils import (
@@ -21,12 +22,12 @@ args = parser.parse_args()
 def main_worker(rank, config):
     if 'local_rank' not in config:
         config['local_rank'] = config['global_rank'] = rank
-    if torch.cuda.is_available():
-        print(f'Rank {rank} is available')
-        config['device'] = f"cuda:{rank}"
-        if config['distributed']:
-            dist.init_process_group(backend='nccl', 
-                                    timeout=datetime.timedelta(seconds=5400))
+    # if torch.cuda.is_available():
+    print(f'Rank {rank} is available')
+    config['device'] = f"cuda:{rank}"
+    if config['distributed']:
+        dist.init_process_group(backend='nccl', 
+                                timeout=datetime.timedelta(seconds=5400))
     else:
         config['device'] = 'cpu'
 
@@ -54,11 +55,12 @@ def main_worker(rank, config):
 
 
 if __name__ == "__main__":
-    torch.backends.cudnn.benchmark = True
+    # torch.backends.cudnn.benchmark = True
     cfg = OmegaConf.load(args.config)
     seed_all(cfg.seed)
     rank = int(args.local_rank)
-    torch.cuda.set_device(torch.device(f'cuda:{rank}'))
+    # torch.cuda.set_device(torch.device(f'cuda:{rank}'))
+    ms.set_context(device_target="GPU")
     # setting distributed cfgurations
     cfg['world_size'] = get_world_size()
     cfg['local_rank'] = rank

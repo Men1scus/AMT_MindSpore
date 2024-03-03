@@ -1,18 +1,33 @@
 import numpy as np
-import torch
+# import torch
+import mindspore as ms
 from PIL import ImageFile
-import torch.nn.functional as F
+# import torch.nn.functional as F
+import mindspore.ops as ops 
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 def warp(img, flow):
     B, _, H, W = flow.shape
-    xx = torch.linspace(-1.0, 1.0, W).view(1, 1, 1, W).expand(B, -1, H, -1)
-    yy = torch.linspace(-1.0, 1.0, H).view(1, 1, H, 1).expand(B, -1, -1, W)
-    grid = torch.cat([xx, yy], 1).to(img)
-    flow_ = torch.cat([flow[:, 0:1, :, :] / ((W - 1.0) / 2.0), flow[:, 1:2, :, :] / ((H - 1.0) / 2.0)], 1)
+    start = ms.Tensor(-1.0, ms.float32)
+    limit = ms.Tensor(1.0, ms.float32)
+    delta_W = ms.Tensor(W, ms.int32)
+    delta_H = ms.Tensor(H, ms.int32)
+    # xx = torch.linspace(-1.0, 1.0, W).view(1, 1, 1, W).expand(B, -1, H, -1)
+    # yy = torch.linspace(-1.0, 1.0, H).view(1, 1, H, 1).expand(B, -1, -1, W)
+    # grid = torch.cat([xx, yy], 1).to(img)
+    # flow_ = torch.cat([flow[:, 0:1, :, :] / ((W - 1.0) / 2.0), flow[:, 1:2, :, :] / ((H - 1.0) / 2.0)], 1)
+    # grid_ = (grid + flow_).permute(0, 2, 3, 1)
+    # output = F.grid_sample(input=img, grid=grid_, mode='bilinear', padding_mode='border', align_corners=True)
+
+    xx = ops.linspace(start, limit, delta_W).view(1, 1, 1, W).expand(B, -1, H, -1)
+    yy = ops.linspace(start, limit, delta_H).view(1, 1, H, 1).expand(B, -1, -1, W)
+    grid = ops.cat([xx, yy], 1).to(img)
+    flow_ = ops.cat([flow[:, 0:1, :, :] / ((W - 1.0) / 2.0), flow[:, 1:2, :, :] / ((H - 1.0) / 2.0)], 1)
     grid_ = (grid + flow_).permute(0, 2, 3, 1)
-    output = F.grid_sample(input=img, grid=grid_, mode='bilinear', padding_mode='border', align_corners=True)
+    output = ops.grid_sample(input=img, grid=grid_, mode='bilinear', padding_mode='border', align_corners=True)
+
     return output
 
 

@@ -1,6 +1,6 @@
 import os
 import torch
-
+import mindspore as ms
 
 def get_world_size():
     """Find OMPI world size without calling mpi functions
@@ -12,7 +12,7 @@ def get_world_size():
         return int(os.environ.get('OMPI_COMM_WORLD_SIZE') or 1)
     else:
         return torch.cuda.device_count()
-
+        # return ms.get_context()
 
 def get_global_rank():
     """Find OMPI world rank without calling mpi functions
