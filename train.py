@@ -25,11 +25,11 @@ def main_worker(rank, config):
     # if torch.cuda.is_available():
     print(f'Rank {rank} is available')
     config['device'] = f"cuda:{rank}"
-    if config['distributed']:
-        dist.init_process_group(backend='nccl', 
-                                timeout=datetime.timedelta(seconds=5400))
-    else:
-        config['device'] = 'cpu'
+    # if config['distributed']:
+    #     dist.init_process_group(backend='nccl', 
+    #                             timeout=datetime.timedelta(seconds=5400))
+    # else:
+    #     config['device'] = 'cpu'
 
     cfg_name = os.path.basename(args.config).split('.')[0]
     config['exp_name'] = cfg_name + '_' + config['exp_name']
@@ -56,11 +56,13 @@ def main_worker(rank, config):
 
 if __name__ == "__main__":
     # torch.backends.cudnn.benchmark = True
+    ms.set_context(device_target='GPU', pynative_synchronize=True)
+    # ms.set_context(save_graphs=False)
     cfg = OmegaConf.load(args.config)
     seed_all(cfg.seed)
     rank = int(args.local_rank)
     # torch.cuda.set_device(torch.device(f'cuda:{rank}'))
-    ms.set_context(device_target="GPU")
+    
     # setting distributed cfgurations
     cfg['world_size'] = get_world_size()
     cfg['local_rank'] = rank

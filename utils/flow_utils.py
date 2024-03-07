@@ -14,6 +14,7 @@ def warp(img, flow):
     limit = ms.Tensor(1.0, ms.float32)
     delta_W = ms.Tensor(W, ms.int32)
     delta_H = ms.Tensor(H, ms.int32)
+
     # xx = torch.linspace(-1.0, 1.0, W).view(1, 1, 1, W).expand(B, -1, H, -1)
     # yy = torch.linspace(-1.0, 1.0, H).view(1, 1, H, 1).expand(B, -1, -1, W)
     # grid = torch.cat([xx, yy], 1).to(img)
@@ -21,9 +22,26 @@ def warp(img, flow):
     # grid_ = (grid + flow_).permute(0, 2, 3, 1)
     # output = F.grid_sample(input=img, grid=grid_, mode='bilinear', padding_mode='border', align_corners=True)
 
-    xx = ops.linspace(start, limit, delta_W).view(1, 1, 1, W).expand(B, -1, H, -1)
-    yy = ops.linspace(start, limit, delta_H).view(1, 1, H, 1).expand(B, -1, -1, W)
-    grid = ops.cat([xx, yy], 1).to(img)
+    # xx = ops.linspace(start, limit, delta_W).view(1, 1, 1, W).expand(B, -1, H, -1)
+    # yy = ops.linspace(start, limit, delta_H).view(1, 1, H, 1).expand(B, -1, -1, W)
+
+    # xx = ops.linspace(start, limit, delta_W).view(1, 1, 1, W)
+    # xx = ops.broadcast_to(xx, (B, -1, H, -1))
+    # # xx = ms.Tensor(xx)
+
+    # yy = ops.linspace(start, limit, delta_H).view(1, 1, H, 1)
+    # yy = ops.broadcast_to(yy, (B, -1, -1, W))
+    # # yy = ms.Tensor(yy)
+    # print('----------------', xx.type())
+    xx = ops.linspace(start, limit, delta_W).view(1, 1, 1, W).broadcast_to((B, -1, H, -1))
+    # print(xx.type())
+    # xx = ops.broadcast_to(xx, (B, -1, H, -1))
+    yy = ops.linspace(start, limit, delta_H).view(1, 1, H, 1).broadcast_to((B, -1, -1, W))
+    # yy = ops.broadcast_to(yy, (B, -1, -1, W))
+
+    # grid = ops.cat([xx, yy], 1).to(img)
+    grid = ops.cast(ops.cat([xx, yy], 1), img.dtype)
+    # grid = torch.cat([xx, yy], 1).to(img)
     flow_ = ops.cat([flow[:, 0:1, :, :] / ((W - 1.0) / 2.0), flow[:, 1:2, :, :] / ((H - 1.0) / 2.0)], 1)
     grid_ = (grid + flow_).permute(0, 2, 3, 1)
     output = ops.grid_sample(input=img, grid=grid_, mode='bilinear', padding_mode='border', align_corners=True)

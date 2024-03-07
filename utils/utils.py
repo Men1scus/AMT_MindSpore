@@ -89,8 +89,10 @@ def img2tensor(img):
 
 
 def tensor2img(img_t):
-    return (img_t * 255.).detach(
-                        ).squeeze(0).permute(1, 2, 0).cpu().numpy(
+    # return (img_t * 255.).detach(
+    #                     ).squeeze(0).permute(1, 2, 0).cpu().numpy(
+    #                     ).clip(0, 255).astype(np.uint8)
+    return (img_t * 255.).squeeze(0).permute(1, 2, 0).numpy(
                         ).clip(0, 255).astype(np.uint8)
 
 def seed_all(seed):

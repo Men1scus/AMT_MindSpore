@@ -4,16 +4,17 @@
 import mindspore as ms
 import mindspore.nn as nn
 from mindspore import ops, Tensor
-
+# https://www.mindspore.cn/docs/zh-CN/r2.2/note/api_mapping/pytorch_diff/interpolate.html?highlight=interpolate
 def resize(x, scale_factor):
     # return F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
-    return ops.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
+    return ops.interpolate(x, scale_factor=float(scale_factor), mode="bilinear", align_corners=False, recompute_scale_factor=True)
 
 
 def bilinear_sampler(img, coords, mask=False):
     """ Wrapper for grid_sample, uses pixel coordinates """
     H, W = img.shape[-2:]
-    xgrid, ygrid = coords.split([1,1], dim=-1)
+    # xgrid, ygrid = coords.split([1,1], dim=-1)
+    xgrid, ygrid = coords.split([1,1], axis=-1)
     xgrid = 2*xgrid/(W-1) - 1
     ygrid = 2*ygrid/(H-1) - 1
 
@@ -29,7 +30,8 @@ def bilinear_sampler(img, coords, mask=False):
     return img
 
 
-def coords_grid(batch, ht, wd, device):
+# def coords_grid(batch, ht, wd, device):
+def coords_grid(batch, ht, wd):
     # coords = torch.meshgrid(torch.arange(ht, device=device), 
     #                         torch.arange(wd, device=device), 
     #                         indexing='ij')
@@ -37,9 +39,10 @@ def coords_grid(batch, ht, wd, device):
     coords = ops.meshgrid(ops.arange(ht), 
                             ops.arange(wd), 
                             indexing='ij')
-    coords = ops.stack(coords[::-1], dim=0).float()
-    return coords[None].repeat(batch, 1, 1, 1)
-
+    # coords = ops.stack(coords[::-1], dim=0).float()
+    coords = ops.stack(coords[::-1], axis=0).float()
+    # return coords[None].repeat(batch, 1, 1, 1)
+    return coords[None].repeat(batch, axis=0)
 
 # class SmallUpdateBlock(nn.Module):
 class SmallUpdateBlock(nn.Cell):
@@ -218,7 +221,10 @@ class BidirCorrBlock:
 
         corr = BidirCorrBlock.corr(fmap1, fmap2)
         batch, h1, w1, dim, h2, w2 = corr.shape
-        corr_T = corr.clone().permute(0, 4, 5, 3, 1, 2)
+        # corr_T = corr.clone().permute(0, 4, 5, 3, 1, 2)
+        corr_T = ops.permute(corr, (0, 4, 5, 3, 1, 2))
+        # corr_T = ms.tensor(corr).permute(0, 4, 5, 3, 1, 2)
+        
 
         corr = corr.reshape(batch*h1*w1, dim, h2, w2)
         corr_T = corr_T.reshape(batch*h2*w2, dim, h1, w1)
@@ -288,4 +294,4 @@ class BidirCorrBlock:
 
         corr = ops.matmul(fmap1.swapaxes(1,2), fmap2)
         corr = corr.view(batch, ht, wd, 1, ht, wd)
-        return corr  / ops.sqrt(ms.Tensor(dim).float())
+        return corr  / ops.sqrt(ms.tensor(dim).float())

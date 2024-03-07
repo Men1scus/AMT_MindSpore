@@ -33,7 +33,10 @@ parser.add_argument("--save_images", action='store_true', default=False)
 
 args = parser.parse_args()
 # ----------------------- Initialization ----------------------- 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = 'GPU'
+ms.set_context(device_target=device, pynative_synchronize=True)
+
 cfg_path = args.config
 ckpt_path = args.ckpt
 input_path = args.input
@@ -41,11 +44,13 @@ out_path = args.out_path
 iters = int(args.niters)
 frame_rate = int(args.frame_rate)
 save_images = args.save_images
-if device == 'cuda':
+# if device == 'cuda':
+if device == 'GPU':
     anchor_resolution = 1024 * 512
     anchor_memory = 1500 * 1024**2
     anchor_memory_bias = 2500 * 1024**2
-    vram_avail = torch.cuda.get_device_properties(device).total_memory
+    # vram_avail = torch.cuda.get_device_properties(device).total_memory
+    vram_avail = torch.cuda.get_device_properties('cuda').total_memory
     print("VRAM available: {:.1f} MB".format(vram_avail / 1024 ** 2))
 else:
     # Do not resize in cpu mode
@@ -117,7 +122,8 @@ else:
     inputs = padder.pad(*inputs)
 
 
-embt = torch.tensor(1/2).float().view(1, 1, 1, 1).to(device)
+# embt = torch.tensor(1/2).float().view(1, 1, 1, 1).to(device)
+embt = ms.tensor(1/2).float().view(1, 1, 1, 1)
 
 if osp.exists(out_path) is False:
     os.makedirs(out_path)
@@ -130,11 +136,12 @@ model = build_from_cfg(network_cfg)
 # ckpt = torch.load(ckpt_path)
 # model.load_state_dict(ckpt['state_dict'])
 param_dict = ms.load_checkpoint(ckpt_path)
-ms.load_param_into_net(model, param_dict)
+param_not_load, _ = ms.load_param_into_net(model, param_dict)
+print(param_not_load)
 
-model = model.to(device)
-model.eval()
-
+# model = model.to(device)
+# model.eval()
+model.set_train(False)
 # -----------------------  Interpolater ----------------------- 
 print(f'Start frame interpolation:')
 total_frames = (iters + 1) * (iters + 2) / 2
@@ -142,11 +149,14 @@ for i in range(iters):
     print(f'Iter {i+1}. input_frames={len(inputs)} output_frames={2*len(inputs)-1}')
     outputs = [inputs[0]]
     for in_0, in_1 in zip(inputs[:-1], inputs[1:]):
-        in_0 = in_0.to(device)
-        in_1 = in_1.to(device)
-        with torch.no_grad():
-            imgt_pred = model(in_0, in_1, embt, scale_factor=scale, eval=True)['imgt_pred']
-        outputs += [imgt_pred.cpu(), in_1.cpu()]
+        # in_0 = in_0.to(device)
+        # in_1 = in_1.to(device)
+        in_0 = in_0
+        in_1 = in_1
+        # with torch.no_grad():
+        imgt_pred = model(in_0, in_1, embt, scale_factor=scale, eval=True)['imgt_pred']
+        # outputs += [imgt_pred.cpu(), in_1.cpu()]
+        outputs += [imgt_pred, in_1]
     inputs = outputs
 
 # -----------------------  Write video to disk ----------------------- 
@@ -169,6 +179,8 @@ if save_images and len(outputs) > 50:
 for i, imgt_pred in enumerate(outputs):
     imgt_pred = tensor2img(imgt_pred)
     if save_images:
+
+        
         write(f'{sample_path}/sample_{sample_count:04d}.png', imgt_pred)
         sample_count += 1
     imgt_pred = cv2.cvtColor(imgt_pred, cv2.COLOR_RGB2BGR)

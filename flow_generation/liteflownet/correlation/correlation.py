@@ -3,7 +3,7 @@
 import cupy
 import math
 import re
-import torch
+# import torch
 
 kernel_Correlation_rearrange = '''
     extern "C" __global__ void kernel_Correlation_rearrange(

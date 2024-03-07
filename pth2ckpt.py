@@ -4,21 +4,6 @@ import mindspore as ms
 import os
 from networks.AMT_S import Model
 
-# Reference: https://www.mindspore.cn/docs/zh-CN/r2.2/migration_guide/sample_code.html
-
-# def pytorch2mindspore(default_file = '/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.pth'):
-#     # read pth file
-#     par_dict = torch.load(default_file)['state_dict']
-#     params_list = []
-#     for name in par_dict:
-#         param_dict = {}
-#         print(name)
-#         parameter = par_dict[name]
-#         param_dict['name'] = name
-#         param_dict['data'] = ms.Tensor(parameter.numpy())
-#         params_list.append(param_dict)
-#     ms.save_checkpoint(params_list,  'amt-s.ckpt')
-
 def pytorch_params(pth_file):
     par_dict = torch.load(pth_file, map_location='cpu')
     pt_params = {}
@@ -288,8 +273,11 @@ feat_encoder.norm1.beta (32,)
 feat_encoder.conv1.weight (32, 3, 7, 7)
 feat_encoder.conv1.bias (32,)
 feat_encoder.layer1.0.conv1.weight (8, 32, 1, 1)
+feat_encoder.layer1.0.conv1.bias (8,)
 feat_encoder.layer1.0.conv2.weight (8, 8, 3, 3)
+feat_encoder.layer1.0.conv2.bias (8,)
 feat_encoder.layer1.0.conv3.weight (32, 8, 1, 1)
+feat_encoder.layer1.0.conv3.bias (32,)
 feat_encoder.layer1.0.norm1.moving_mean (8,)
 feat_encoder.layer1.0.norm1.moving_variance (8,)
 feat_encoder.layer1.0.norm1.gamma (8,)
@@ -303,8 +291,11 @@ feat_encoder.layer1.0.norm3.moving_variance (32,)
 feat_encoder.layer1.0.norm3.gamma (32,)
 feat_encoder.layer1.0.norm3.beta (32,)
 feat_encoder.layer1.1.conv1.weight (8, 32, 1, 1)
+feat_encoder.layer1.1.conv1.bias (8,)
 feat_encoder.layer1.1.conv2.weight (8, 8, 3, 3)
+feat_encoder.layer1.1.conv2.bias (8,)
 feat_encoder.layer1.1.conv3.weight (32, 8, 1, 1)
+feat_encoder.layer1.1.conv3.bias (32,)
 feat_encoder.layer1.1.norm1.moving_mean (8,)
 feat_encoder.layer1.1.norm1.moving_variance (8,)
 feat_encoder.layer1.1.norm1.gamma (8,)
@@ -318,8 +309,11 @@ feat_encoder.layer1.1.norm3.moving_variance (32,)
 feat_encoder.layer1.1.norm3.gamma (32,)
 feat_encoder.layer1.1.norm3.beta (32,)
 feat_encoder.layer2.0.conv1.weight (16, 32, 1, 1)
+feat_encoder.layer2.0.conv1.bias (16,)
 feat_encoder.layer2.0.conv2.weight (16, 16, 3, 3)
+feat_encoder.layer2.0.conv2.bias (16,)
 feat_encoder.layer2.0.conv3.weight (64, 16, 1, 1)
+feat_encoder.layer2.0.conv3.bias (64,)
 feat_encoder.layer2.0.norm1.moving_mean (16,)
 feat_encoder.layer2.0.norm1.moving_variance (16,)
 feat_encoder.layer2.0.norm1.gamma (16,)
@@ -339,8 +333,11 @@ feat_encoder.layer2.0.norm4.beta (64,)
 feat_encoder.layer2.0.downsample.0.weight (64, 32, 1, 1)
 feat_encoder.layer2.0.downsample.0.bias (64,)
 feat_encoder.layer2.1.conv1.weight (16, 64, 1, 1)
+feat_encoder.layer2.1.conv1.bias (16,)
 feat_encoder.layer2.1.conv2.weight (16, 16, 3, 3)
+feat_encoder.layer2.1.conv2.bias (16,)
 feat_encoder.layer2.1.conv3.weight (64, 16, 1, 1)
+feat_encoder.layer2.1.conv3.bias (64,)
 feat_encoder.layer2.1.norm1.moving_mean (16,)
 feat_encoder.layer2.1.norm1.moving_variance (16,)
 feat_encoder.layer2.1.norm1.gamma (16,)
@@ -354,8 +351,11 @@ feat_encoder.layer2.1.norm3.moving_variance (64,)
 feat_encoder.layer2.1.norm3.gamma (64,)
 feat_encoder.layer2.1.norm3.beta (64,)
 feat_encoder.layer3.0.conv1.weight (24, 64, 1, 1)
+feat_encoder.layer3.0.conv1.bias (24,)
 feat_encoder.layer3.0.conv2.weight (24, 24, 3, 3)
+feat_encoder.layer3.0.conv2.bias (24,)
 feat_encoder.layer3.0.conv3.weight (96, 24, 1, 1)
+feat_encoder.layer3.0.conv3.bias (96,)
 feat_encoder.layer3.0.norm1.moving_mean (24,)
 feat_encoder.layer3.0.norm1.moving_variance (24,)
 feat_encoder.layer3.0.norm1.gamma (24,)
@@ -375,8 +375,11 @@ feat_encoder.layer3.0.norm4.beta (96,)
 feat_encoder.layer3.0.downsample.0.weight (96, 64, 1, 1)
 feat_encoder.layer3.0.downsample.0.bias (96,)
 feat_encoder.layer3.1.conv1.weight (24, 96, 1, 1)
+feat_encoder.layer3.1.conv1.bias (24,)
 feat_encoder.layer3.1.conv2.weight (24, 24, 3, 3)
+feat_encoder.layer3.1.conv2.bias (24,)
 feat_encoder.layer3.1.conv3.weight (96, 24, 1, 1)
+feat_encoder.layer3.1.conv3.bias (96,)
 feat_encoder.layer3.1.norm1.moving_mean (24,)
 feat_encoder.layer3.1.norm1.moving_variance (24,)
 feat_encoder.layer3.1.norm1.gamma (24,)
@@ -391,6 +394,30 @@ feat_encoder.layer3.1.norm3.gamma (96,)
 feat_encoder.layer3.1.norm3.beta (96,)
 feat_encoder.conv2.weight (84, 96, 1, 1)
 feat_encoder.conv2.bias (84,)
+encoder.pyramid1.0.0.weight (20, 3, 3, 3)
+encoder.pyramid1.0.0.bias (20,)
+encoder.pyramid1.0.1.w (20,)
+encoder.pyramid1.1.0.weight (20, 20, 3, 3)
+encoder.pyramid1.1.0.bias (20,)
+encoder.pyramid1.1.1.w (20,)
+encoder.pyramid2.0.0.weight (32, 20, 3, 3)
+encoder.pyramid2.0.0.bias (32,)
+encoder.pyramid2.0.1.w (32,)
+encoder.pyramid2.1.0.weight (32, 32, 3, 3)
+encoder.pyramid2.1.0.bias (32,)
+encoder.pyramid2.1.1.w (32,)
+encoder.pyramid3.0.0.weight (44, 32, 3, 3)
+encoder.pyramid3.0.0.bias (44,)
+encoder.pyramid3.0.1.w (44,)
+encoder.pyramid3.1.0.weight (44, 44, 3, 3)
+encoder.pyramid3.1.0.bias (44,)
+encoder.pyramid3.1.1.w (44,)
+encoder.pyramid4.0.0.weight (56, 44, 3, 3)
+encoder.pyramid4.0.0.bias (56,)
+encoder.pyramid4.0.1.w (56,)
+encoder.pyramid4.1.0.weight (56, 56, 3, 3)
+encoder.pyramid4.1.0.bias (56,)
+encoder.pyramid4.1.1.w (56,)
 decoder4.convblock.0.0.weight (112, 113, 3, 3)
 decoder4.convblock.0.0.bias (112,)
 decoder4.convblock.0.1.w (112,)
@@ -538,29 +565,42 @@ comb_block.2.weight (3, 18, 3, 3)
 comb_block.2.bias (3,)
 '''
 
+# Reference: https://www.mindspore.cn/docs/zh-CN/r2.2/migration_guide/sample_code.html
+
+# def pytorch2mindspore(default_file = '/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.pth'):
+#     # read pth file
+#     par_dict = torch.load(default_file)['state_dict']
+#     params_list = []
+#     for name in par_dict:
+#         param_dict = {}
+#         print(name)
+#         parameter = par_dict[name]
+#         param_dict['name'] = name
+#         param_dict['data'] = ms.Tensor(parameter.numpy())
+#         params_list.append(param_dict)
+#     ms.save_checkpoint(params_list,  'amt-s.ckpt')
+
+
 def param_convert(ms_params, pt_params, ckpt_path):
     # 参数名映射字典
-    bn_ms2pt = {"gamma": "weight",
-                "beta": "bias",
-                "moving_mean": "running_mean",
-                "moving_variance": "running_var"}
+    # bn_ms2pt = {".w": "weight"}
+
     new_params_list = []
     for ms_param in ms_params.keys():
-        # 在参数列表中，只有包含bn和downsample.1的参数是BatchNorm算子的参数
         if "norm" in ms_param:
-            ms_param_item = ms_param.split(".")
-            pt_param_item = ms_param_item[:-1] + [bn_ms2pt[ms_param_item[-1]]]
-            pt_param = ".".join(pt_param_item)
-            # 如找到参数对应且shape一致，加入到参数列表
-            if pt_param in pt_params and pt_params[pt_param].shape == ms_params[ms_param].shape:
-                ms_value = pt_params[pt_param]
-                new_params_list.append({"name": ms_param, "data": ms.Tensor(ms_value)})
-            else:
-                print(ms_param, "not match in pt_params")
-        # 其他参数
+            pass   
         else:
-            # 如找到参数对应且shape一致，加入到参数列表
-            if ms_param in pt_params and pt_params[ms_param].shape == ms_params[ms_param].shape:
+            # 如找到参数对应加入到参数列表
+            if ms_param[-1] == 'w':
+                # print(ms_param)
+                ms_param_before = ms_param
+                ms_param = ms_param[:-1] + 'weight' 
+                # print(ms_param)
+                if ms_param in pt_params:
+                    ms_value = pt_params[ms_param]
+                    new_params_list.append({"name": ms_param_before, "data": ms.Tensor(ms_value)})
+
+            elif ms_param in pt_params:
                 ms_value = pt_params[ms_param]
                 new_params_list.append({"name": ms_param, "data": ms.Tensor(ms_value)})
             else:
@@ -568,7 +608,9 @@ def param_convert(ms_params, pt_params, ckpt_path):
     # 保存成MindSpore的checkpoint
     ms.save_checkpoint(new_params_list, ckpt_path)
 
-# ckpt_path = "/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.ckpt"
-# param_convert(mindspore_params(Model()), pytorch_params('/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.pth'), ckpt_path)
-mindspore_params(Model())
-# pytorch_params('/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.pth')
+ckpt_path = "/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.ckpt"
+param_convert(mindspore_params(Model()), pytorch_params('/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.pth'), ckpt_path)
+# mindspore_params(Model())
+# # pytorch_params('/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.pth')
+
+# pytorch2mindspore()

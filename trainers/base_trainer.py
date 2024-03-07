@@ -13,7 +13,10 @@ from collections import OrderedDict
 import mindspore as ms
 from mindspore.nn import AdamWeightDecay
 from mindspore.dataset import GeneratorDataset, DistributedSampler
-
+import mindspore.dataset.transforms.c_transforms as C
+from mindspore import dtype as mstype
+import mindspore.dataset.vision as vision
+from mindspore.dataset.transforms import Compose
 
 from .logger import CustomLogger
 from utils.utils import AverageMeterGroups
@@ -106,7 +109,8 @@ class Trainer:
         # self.sampler = DistributedSampler(
         #     dataset_train, num_replicas=self.config['world_size'], rank=self.config['local_rank'])
         self.sampler = DistributedSampler( num_shards=self.config['world_size'], shard_id=self.config['local_rank'])
-        self.config.data.train_loader.batch_size //= self.config['world_size']
+        batch_size = self.config.data.train_loader.batch_size
+        batch_size //= self.config['world_size']
 
         
         # self.loader_train = DataLoader(dataset_train,
@@ -125,7 +129,12 @@ class Trainer:
                                         sampler=self.sampler, # 一致
                                         column_names=['data']
                                         )
-        self.loader_train = self.loader_train.batch(batch_size=self.config.data.train_loader.batch_size, drop_remainder=True)
+
+        
+        type_cast_op_image = C.TypeCast(mstype.float32)
+        trans = Compose([vision.ToTensor()])
+        # self.loader_train = self.loader_train.map(operations=trans, input_columns="data")
+        self.loader_train = self.loader_train.batch(batch_size=batch_size, drop_remainder=True)
 
         self.loader_val = GeneratorDataset(dataset_val, 
                                         # **self.config.data.val_loader,
@@ -135,7 +144,9 @@ class Trainer:
                                         shuffle=False, # 一致
                                         column_names=['data']
                                         )
+        # self.loader_val = self.loader_val.map(operations=trans, input_columns="data")
         self.loader_val = self.loader_val.batch(batch_size=self.config.data.val_loader.batch_size, drop_remainder=False)
+
     def _init_loss(self):
         self.loss_dict = dict()
         for loss_cfg in self.config.losses:
@@ -154,6 +165,7 @@ class Trainer:
         return lr
 
     def train(self):
+        self.model.set_train(True)
         local_rank = self.config['local_rank']
         best_psnr = 0.0
         loss_group = AverageMeterGroups()
@@ -166,21 +178,25 @@ class Trainer:
         total_t = 0
         for epoch in range(self.resume_epoch, self.config['epochs']):
             # self.sampler.set_epoch(epoch)
+            print('============================')
             for data in self.loader_train:
-                for k, v in data.items():
-                    data[k] = v.to(self.config['device'])
+                # for k, v in data.items():
+                #     # data[k] = v.to(self.config['device'])
+                #     data[k] = v
+                print('ppppppppppppppppppp')
                 data_t = time.time() - start_t
-
+                print('-------------------')
                 lr = self.get_lr(iters)
                 self.set_lr(self.optimizer, lr)
 
                 self.optimizer.zero_grad()
                 results = self.model(**data)
                 # total_loss = torch.tensor(0., device=self.config['device'])
-                total_loss = ms.Tensor(0.)
+                total_loss = ms.tensor(0.)
                 for name, loss in self.loss_dict.items():
                     l = loss(**results, **data)
-                    loss_group.update({name: l.cpu().data})
+                    # loss_group.update({name: l.cpu().data})
+                    loss_group.update({name: l.data})
                     total_loss += l
                 total_loss.backward()
                 self.optimizer.step()
@@ -228,11 +244,15 @@ class Trainer:
         self.logger.close()
 
     def evaluate(self, epoch):
+        self.model.set_train(False)
+        
         psnr_list = []
         time_stamp = time.time()
         for i, data in enumerate(self.loader_val):
             for k, v in data.items():
-                data[k] = v.to(self.config['device'])
+                # data[k] = v.to(self.config['device'])
+                data[k] = v
+
 
             # with torch.no_grad():
             results = self.model(**data, eval=True)
@@ -242,11 +262,16 @@ class Trainer:
                 #     0), data['imgt'][j].unsqueeze(0)).cpu().data
                 # psnr_list.append(psnr)
                 
-                psnr = calculate_psnr(imgt_pred[j].detach().unsqueeze(0), data['imgt'][j].unsqueeze(0))
-                # 先把numpy转换成Pytorch中的Tensor类型，才能调用.cpu()
-                # psnr_tensor = torch.from_numpy(psnr).to(self.config['device'])  # Assuming calculate_psnr returns a NumPy array
-                psnr_tensor = ms.Tensor.from_numpy(psnr).to(self.config['device'])  # Assuming calculate_psnr returns a NumPy array
-                psnr_list.append(psnr_tensor.cpu().data)  # Now calling .cpu() on a PyTorch tensor
+                psnr = calculate_psnr(imgt_pred[j].unsqueeze(
+                    0), data['imgt'][j].unsqueeze(0)).data
+                psnr_list.append(psnr)
+
+                # psnr = calculate_psnr(imgt_pred[j].detach().unsqueeze(0), data['imgt'][j].unsqueeze(0))
+                # # 先把numpy转换成Pytorch中的Tensor类型，才能调用.cpu()
+                # # psnr_tensor = torch.from_numpy(psnr).to(self.config['device'])  # Assuming calculate_psnr returns a NumPy array
+                # # psnr_tensor = ms.Tensor.from_numpy(psnr).to(self.config['device']) # Assuming calculate_psnr returns a NumPy array
+                # psnr_tensor = ms.Tensor.from_numpy(psnr) # Assuming calculate_psnr returns a NumPy array
+                # psnr_list.append(psnr_tensor.data)  # Now calling .cpu() on a PyTorch tensor
 
 
         eval_time = time.time() - time_stamp

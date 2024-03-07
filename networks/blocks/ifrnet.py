@@ -9,7 +9,7 @@ from utils.flow_utils import warp
 
 def resize(x, scale_factor):
     # return F.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
-    return ops.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False)
+    return ops.interpolate(x, scale_factor=scale_factor, mode="bilinear", align_corners=False, recompute_scale_factor=True)
 
 def convrelu(in_channels, out_channels, kernel_size=3, stride=1, padding=1, dilation=1, groups=1, bias=True):
     # return nn.Sequential(
@@ -87,26 +87,24 @@ class Encoder(nn.Cell):
     def __init__(self, channels, large=False):
         super(Encoder, self).__init__()
         self.channels = channels        
-        self.pyramid = nn.CellList()
         prev_ch = 3
         for idx, ch in enumerate(channels, 1):
             k = 7 if large and idx == 1 else 3
             p = 3 if k ==7 else 1
+# register_module: Alias for add_module().
             # self.register_module(f'pyramid{idx}', 
             # # nn.Sequential(
             # #     convrelu(prev_ch, ch, k, 2, p),
             # #     convrelu(ch, ch, 3, 1, 1)
             # # ))
                                  
-            # nn.SequentialCell(
-            #     convrelu(prev_ch, ch, k, 2, p),
-            #     convrelu(ch, ch, 3, 1, 1)
-            # ))           
-            layer = nn.SequentialCell(
+            self.insert_child_to_cell(f'pyramid{idx}',
+            nn.SequentialCell(
                 convrelu(prev_ch, ch, k, 2, p),
                 convrelu(ch, ch, 3, 1, 1)
+            ) 
             )
-            self.pyramid.append(layer)
+            
             prev_ch = ch
                 
     # def forward(self, in_x):
@@ -135,7 +133,8 @@ class InitDecoder(nn.Cell):
     # def forward(self, f0, f1, embt):
     def construct(self, f0, f1, embt):
         h, w = f0.shape[2:]
-        embt = embt.repeat(1, 1, h, w)
+        # embt = embt.repeat(1, 1, h, w)
+        embt = embt.repeat(h, axis=2).repeat(w, axis=3)
         # out = self.convblock(torch.cat([f0, f1, embt], 1))
         # flow0, flow1 = torch.chunk(out[:, :4, ...], 2, 1)
         out = self.convblock(ops.cat([f0, f1, embt], 1))

@@ -78,21 +78,22 @@ class Model(nn.Cell):
         corr0, corr1 = corr_fn(coord + flow1 * t1_scale, coord + flow0 * t0_scale) 
         # corr = torch.cat([corr0, corr1], dim=1)
         # flow = torch.cat([flow0, flow1], dim=1)
-        corr = ops.cat([corr0, corr1], dim=1)
-        flow = ops.cat([flow0, flow1], dim=1)
+        corr = ops.cat([corr0, corr1], axis=1)
+        flow = ops.cat([flow0, flow1], axis=1)
         return corr, flow
 
     # def forward(self, img0, img1, embt, scale_factor=1.0, eval=False, **kwargs):
     def construct(self, img0, img1, embt, scale_factor=1.0, eval=False, **kwargs):
         # mean_ = torch.cat([img0, img1], 2).mean(1, keepdim=True).mean(2, keepdim=True).mean(3, keepdim=True)
-        mean_ = ops.cat([img0, img1], 2).mean(1, keepdim=True).mean(2, keepdim=True).mean(3, keepdim=True)
+        mean_ = ops.cat([img0, img1], 2).mean(1, keep_dims=True).mean(2, keep_dims=True).mean(3, keep_dims=True)
 
         img0 = img0 - mean_
         img1 = img1 - mean_
         img0_ = resize(img0, scale_factor) if scale_factor != 1.0 else img0
         img1_ = resize(img1, scale_factor) if scale_factor != 1.0 else img1
         b, _, h, w = img0_.shape
-        coord = coords_grid(b, h // 8, w // 8, img0.device)
+        # coord = coords_grid(b, h // 8, w // 8, img0.device)
+        coord = coords_grid(b, h // 8, w // 8)
         
         fmap0, fmap1 = self.feat_encoder([img0_, img1_]) # [1, 128, H//8, W//8]
         corr_fn = BidirCorrBlock(fmap0, fmap1, radius=self.radius, num_levels=self.corr_levels)

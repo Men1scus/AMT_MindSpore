@@ -80,9 +80,13 @@ class MultiFlowDecoder(nn.Cell):
         delta_flow0, delta_flow1, mask, img_res = ops.split(out, [2*n, 2*n, n, 3*n], 1)
         mask = ops.sigmoid(mask)
         
+        # flow0 = delta_flow0 + 2.0 * resize(flow0, scale_factor=2.0
+        #                                    ).repeat(1, self.num_flows, 1, 1)
+        # flow1 = delta_flow1 + 2.0 * resize(flow1, scale_factor=2.0
+        #                                    ).repeat(1, self.num_flows, 1, 1)
         flow0 = delta_flow0 + 2.0 * resize(flow0, scale_factor=2.0
-                                           ).repeat(1, self.num_flows, 1, 1)
+                                           ).repeat(self.num_flows, axis=1)
         flow1 = delta_flow1 + 2.0 * resize(flow1, scale_factor=2.0
-                                           ).repeat(1, self.num_flows, 1, 1)
+                                           ).repeat(self.num_flows, axis=1)
         
         return flow0, flow1, mask, img_res
