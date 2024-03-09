@@ -2,7 +2,10 @@
 import torch
 import mindspore as ms
 import os
-from networks.AMT_S import Model
+# from networks.AMT_S_MindSpore import Model
+from networks.AMT_G_MIndSpore import Model
+# from networks.AMT_L_MindSpore import Model
+
 
 def pytorch_params(pth_file):
     par_dict = torch.load(pth_file, map_location='cpu')
@@ -608,8 +611,14 @@ def param_convert(ms_params, pt_params, ckpt_path):
     # 保存成MindSpore的checkpoint
     ms.save_checkpoint(new_params_list, ckpt_path)
 
-ckpt_path = "/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.ckpt"
-param_convert(mindspore_params(Model()), pytorch_params('/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.pth'), ckpt_path)
+# ckpt_path = "/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.ckpt"
+ckpt_path = "/root/autodl-tmp/AMT_MindSpore/pretrained/amt-g.ckpt"
+# ckpt_path = "/root/autodl-tmp/AMT_MindSpore/pretrained/amt-l.ckpt"
+
+# param_convert(mindspore_params(Model()), pytorch_params('/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.pth'), ckpt_path)
+param_convert(mindspore_params(Model()), pytorch_params('/root/autodl-tmp/AMT_MindSpore/pretrained/amt-g.pth'), ckpt_path)
+# param_convert(mindspore_params(Model()), pytorch_params('/root/autodl-tmp/AMT_MindSpore/pretrained/amt-l.pth'), ckpt_path)
+
 # mindspore_params(Model())
 # # pytorch_params('/root/autodl-tmp/AMT_MindSpore/pretrained/amt-s.pth')
 

@@ -280,7 +280,8 @@ class BasicEncoder(nn.Cell):
         if dropout > 0:
             self.dropout = nn.Dropout2d(p=dropout)
 
-        for m in self.modules():
+        # for m in self.modules():
+        for m in self.cells():
             # if isinstance(m, nn.Conv2d):
             #     nn.init._normal_(m.weight, mode='fan_out', nonlinearity='relu')
             # elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
@@ -317,7 +318,8 @@ class BasicEncoder(nn.Cell):
         return nn.SequentialCell(*layers)
 
 
-    def forward(self, x):
+    # def forward(self, x):
+    def construct(self, x):
 
         # if input is list, combine batch dimension
         is_list = isinstance(x, tuple) or isinstance(x, list)
@@ -383,7 +385,8 @@ class LargeEncoder(nn.Cell):
         if dropout > 0:
             self.dropout = nn.Dropout2d(p=dropout)
 
-        for m in self.modules():
+        # for m in self.modules():
+        for m in self.cells():
             # if isinstance(m, nn.Conv2d):
             #     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             # elif isinstance(m, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
@@ -398,18 +401,18 @@ class LargeEncoder(nn.Cell):
                         ms.common.initializer.HeNormal(negative_slope=0, mode='fan_out', nonlinearity='relu'),
                         cell.weight.shape, cell.weight.dtype))
                 elif isinstance(cell, (nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm)):
-                    if cell.weight is not None:
+                    if cell.gamma is not None:
                         cell.gamma.set_data(ms.common.initializer.initializer("ones", cell.gamma.shape, cell.gamma.dtype))
-                    if cell.bias is not None: 
+                    if cell.beta is not None: 
                         cell.beta.set_data(ms.common.initializer.initializer("zeros", cell.beta.shape, cell.beta.dtype))
                     
-                elif isinstance(cell, (nn.Dense)):
-                    if cell.weight is not None:
-                        cell.weight.set_data(ms.common.initializer.initializer(
-                            ms.common.initializer.HeUniform(negative_slope=math.sqrt(5)),
-                            cell.weight.shape, cell.weight.dtype))
-                    if cell.bias is not None:
-                        cell.bias.set_data(ms.common.initializer.initializer("zeros", cell.bias.shape, cell.bias.dtype))
+                # elif isinstance(cell, (nn.Dense)):
+                #     if cell.weight is not None:
+                #         cell.weight.set_data(ms.common.initializer.initializer(
+                #             ms.common.initializer.HeUniform(negative_slope=math.sqrt(5)),
+                #             cell.weight.shape, cell.weight.dtype))
+                #     if cell.bias is not None:
+                #         cell.bias.set_data(ms.common.initializer.initializer("zeros", cell.bias.shape, cell.bias.dtype))
 
     def _make_layer(self, dim, stride=1):
         layer1 = ResidualBlock(self.in_planes, dim, self.norm_fn, stride=stride)
@@ -417,10 +420,13 @@ class LargeEncoder(nn.Cell):
         layers = (layer1, layer2)
         
         self.in_planes = dim
-        return nn.Sequential(*layers)
+        # return nn.Sequential(*layers)
+        return nn.SequentialCell(*layers)
 
 
-    def forward(self, x):
+
+    # def forward(self, x):
+    def construct(self, x):
 
         # if input is list, combine batch dimension
         is_list = isinstance(x, tuple) or isinstance(x, list)

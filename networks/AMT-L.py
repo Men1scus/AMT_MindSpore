@@ -1,5 +1,7 @@
-import torch
-import torch.nn as nn
+# import torch
+# import torch.nn as nn
+import mindspore as ms
+from mindspore import nn, ops
 from networks.blocks.raft import (
     coords_grid,
     BasicUpdateBlock, BidirCorrBlock
@@ -19,7 +21,8 @@ from networks.blocks.multi_flow import (
 )
 
 
-class Model(nn.Module):
+# class Model(nn.Module):
+class Model(nn.Cell):
     def __init__(self, 
                  corr_radius=3, 
                  corr_lvls=4, 
@@ -44,11 +47,18 @@ class Model(nn.Module):
         self.update3 = self._get_updateblock(64, 2.0)
         self.update2 = self._get_updateblock(48, 4.0)
         
-        self.comb_block = nn.Sequential(
-            nn.Conv2d(3*self.num_flows, 6*self.num_flows, 7, 1, 3),
+        # self.comb_block = nn.Sequential(
+        #     nn.Conv2d(3*self.num_flows, 6*self.num_flows, 7, 1, 3),
+        #     nn.PReLU(6*self.num_flows),
+        #     nn.Conv2d(6*self.num_flows, 3, 7, 1, 3),
+        # )
+
+        self.comb_block = nn.SequentialCell(
+            nn.Conv2d(3*self.num_flows, 6*self.num_flows, 7, stride=1, padding=3, pad_mode='pad', has_bias=True),
             nn.PReLU(6*self.num_flows),
-            nn.Conv2d(6*self.num_flows, 3, 7, 1, 3),
+            nn.Conv2d(6*self.num_flows, 3, 7, stride=1, padding=3, pad_mode='pad', has_bias=True)
         )
+
 
     def _get_updateblock(self, cdim, scale_factor=None):
         return BasicUpdateBlock(cdim=cdim, hidden_dim=128, flow_dim=48, 
@@ -67,18 +77,26 @@ class Model(nn.Module):
             flow1 = inv * resize(flow1, scale_factor=inv)
             
         corr0, corr1 = corr_fn(coord + flow1 * t1_scale, coord + flow0 * t0_scale) 
-        corr = torch.cat([corr0, corr1], dim=1)
-        flow = torch.cat([flow0, flow1], dim=1)
+        # corr = torch.cat([corr0, corr1], dim=1)
+        # flow = torch.cat([flow0, flow1], dim=1)
+        corr = ops.cat([corr0, corr1], axis=1)
+        flow = ops.cat([flow0, flow1], axis=1)
+
         return corr, flow
     
-    def forward(self, img0, img1, embt, scale_factor=1.0, eval=False, **kwargs):
-        mean_ = torch.cat([img0, img1], 2).mean(1, keepdim=True).mean(2, keepdim=True).mean(3, keepdim=True)
+    # def forward(self, img0, img1, embt, scale_factor=1.0, eval=False, **kwargs):
+    def construct(self, img0, img1, embt, scale_factor=1.0, eval=False, **kwargs):
+
+        # mean_ = torch.cat([img0, img1], 2).mean(1, keepdim=True).mean(2, keepdim=True).mean(3, keepdim=True)
+        mean_ = ops.cat([img0, img1], 2).mean(1, keep_dims=True).mean(2, keep_dims=True).mean(3, keep_dims=True)
+
         img0 = img0 - mean_
         img1 = img1 - mean_
         img0_ = resize(img0, scale_factor) if scale_factor != 1.0 else img0
         img1_ = resize(img1, scale_factor) if scale_factor != 1.0 else img1
         b, _, h, w = img0_.shape
-        coord = coords_grid(b, h // 8, w // 8, img0.device)
+        # coord = coords_grid(b, h // 8, w // 8, img0.device)
+        coord = coords_grid(b, h // 8, w // 8)
         
         fmap0, fmap1 = self.feat_encoder([img0_, img1_]) # [1, 128, H//8, W//8]
         corr_fn = BidirCorrBlock(fmap0, fmap1, radius=self.radius, num_levels=self.corr_levels)
@@ -96,7 +114,8 @@ class Model(nn.Module):
 
         # residue update with lookup corr
         delta_ft_3_, delta_flow_4 = self.update4(ft_3_, flow_4, corr_4)
-        delta_flow0_4, delta_flow1_4 = torch.chunk(delta_flow_4, 2, 1)
+        # delta_flow0_4, delta_flow1_4 = torch.chunk(delta_flow_4, 2, 1)
+        delta_flow0_4, delta_flow1_4 = ops.chunk(delta_flow_4, 2, 1)
         up_flow0_4 = up_flow0_4 + delta_flow0_4
         up_flow1_4 = up_flow1_4 + delta_flow1_4
         ft_3_ = ft_3_ + delta_ft_3_
@@ -109,7 +128,8 @@ class Model(nn.Module):
 
         # residue update with lookup corr
         delta_ft_2_, delta_flow_3 = self.update3(ft_2_, flow_3, corr_3)
-        delta_flow0_3, delta_flow1_3 = torch.chunk(delta_flow_3, 2, 1)
+        # delta_flow0_3, delta_flow1_3 = torch.chunk(delta_flow_3, 2, 1)
+        delta_flow0_3, delta_flow1_3 = ops.chunk(delta_flow_3, 2, 1)
         up_flow0_3 = up_flow0_3 + delta_flow0_3
         up_flow1_3 = up_flow1_3 + delta_flow1_3
         ft_2_ = ft_2_ + delta_ft_2_
@@ -122,7 +142,8 @@ class Model(nn.Module):
         
         # residue update with lookup corr
         delta_ft_1_, delta_flow_2 = self.update2(ft_1_, flow_2, corr_2)
-        delta_flow0_2, delta_flow1_2 = torch.chunk(delta_flow_2, 2, 1)
+        # delta_flow0_2, delta_flow1_2 = torch.chunk(delta_flow_2, 2, 1)
+        delta_flow0_2, delta_flow1_2 = ops.chunk(delta_flow_2, 2, 1)
         up_flow0_2 = up_flow0_2 + delta_flow0_2
         up_flow1_2 = up_flow1_2 + delta_flow1_2
         ft_1_ = ft_1_ + delta_ft_1_
@@ -139,7 +160,8 @@ class Model(nn.Module):
         # Merge multiple predictions 
         imgt_pred = multi_flow_combine(self.comb_block, img0, img1, up_flow0_1, up_flow1_1, 
                                                                         mask, img_res, mean_)
-        imgt_pred = torch.clamp(imgt_pred, 0, 1)
+        # imgt_pred = torch.clamp(imgt_pred, 0, 1)
+        imgt_pred = ops.clamp(imgt_pred, 0, 1)
 
         if eval:
             return  { 'imgt_pred': imgt_pred, }

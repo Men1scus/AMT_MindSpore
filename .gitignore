@@ -7,8 +7,10 @@ work_dir*
 ft_local
 demo.sh
 examples
+pretrained
 
 *.pth
+*.ckpt
 *.zip
 *.pkl
 

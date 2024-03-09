@@ -1,15 +1,13 @@
 # import torch
 # import torch.nn as nn
-# import torch.nn.functional as F
 import mindspore as ms
 from mindspore import nn, ops
-
 from networks.blocks.raft import (
     coords_grid,
     BasicUpdateBlock, BidirCorrBlock
 )
 from networks.blocks.feat_enc import (
-    LargeEncoder
+    BasicEncoder
 )
 from networks.blocks.ifrnet import (
     resize,
@@ -28,27 +26,26 @@ class Model(nn.Cell):
     def __init__(self, 
                  corr_radius=3, 
                  corr_lvls=4, 
-                 num_flows=5, 
-                 channels=[84, 96, 112, 128], 
-                 skip_channels=84):
+                 num_flows=5,
+                 channels=[48, 64, 72, 128], 
+                 skip_channels=48
+                 ):
         super(Model, self).__init__()
         self.radius = corr_radius
         self.corr_levels = corr_lvls
         self.num_flows = num_flows
 
-        self.feat_encoder = LargeEncoder(output_dim=128, norm_fn='instance', dropout=0.)
-        self.encoder = Encoder(channels, large=True)
+        self.feat_encoder = BasicEncoder(output_dim=128, norm_fn='instance', dropout=0.)
+        self.encoder = Encoder([48, 64, 72, 128], large=True)
+        
         self.decoder4 = InitDecoder(channels[3], channels[2], skip_channels)
         self.decoder3 = IntermediateDecoder(channels[2], channels[1], skip_channels)
         self.decoder2 = IntermediateDecoder(channels[1], channels[0], skip_channels)
         self.decoder1 = MultiFlowDecoder(channels[0], skip_channels, num_flows)
 
-        self.update4 = self._get_updateblock(112, None)
-        self.update3_low = self._get_updateblock(96, 2.0)
-        self.update2_low = self._get_updateblock(84, 4.0)
-        
-        self.update3_high = self._get_updateblock(96, None)
-        self.update2_high = self._get_updateblock(84, None)
+        self.update4 = self._get_updateblock(72, None)
+        self.update3 = self._get_updateblock(64, 2.0)
+        self.update2 = self._get_updateblock(48, 4.0)
         
         # self.comb_block = nn.Sequential(
         #     nn.Conv2d(3*self.num_flows, 6*self.num_flows, 7, 1, 3),
@@ -57,15 +54,15 @@ class Model(nn.Cell):
         # )
 
         self.comb_block = nn.SequentialCell(
-            nn.Conv2d(3*self.num_flows, 6*self.num_flows, 7, stride=1, padding=3, pad_mode='pad', has_bias=True),
-            nn.PReLU(6*self.num_flows),
-            nn.Conv2d(6*self.num_flows, 3, 7, stride=1, padding=3, pad_mode='pad', has_bias=True)
+            nn.Conv2d(3*num_flows, 6*num_flows, 7, stride=1, padding=3, pad_mode='pad', has_bias=True),
+            nn.PReLU(6*num_flows),
+            nn.Conv2d(6*num_flows, 3, 7, stride=1, padding=3, pad_mode='pad', has_bias=True)
         )
 
 
     def _get_updateblock(self, cdim, scale_factor=None):
-        return BasicUpdateBlock(cdim=cdim, hidden_dim=192, flow_dim=64, 
-                                corr_dim=256, corr_dim2=192, fc_dim=188, 
+        return BasicUpdateBlock(cdim=cdim, hidden_dim=128, flow_dim=48, 
+                                corr_dim=256, corr_dim2=160, fc_dim=124, 
                                 scale_factor=scale_factor, corr_levels=self.corr_levels, 
                                 radius=self.radius)
 
@@ -84,21 +81,19 @@ class Model(nn.Cell):
         # flow = torch.cat([flow0, flow1], dim=1)
         corr = ops.cat([corr0, corr1], axis=1)
         flow = ops.cat([flow0, flow1], axis=1)
+
         return corr, flow
     
-    # def forward(self, img0, img1, embt, scale_factor=1.0, eval=False, **kwargs):
-    def construct(self, img0, img1, embt, scale_factor=1.0, eval=False, **kwargs):
+    def forward(self, img0, img1, embt, scale_factor=1.0, eval=False, **kwargs):
         # mean_ = torch.cat([img0, img1], 2).mean(1, keepdim=True).mean(2, keepdim=True).mean(3, keepdim=True)
-        mean_ = ops.cat([img0, img1], 2).mean(1, keep_dims=True).mean(2, keep_dims=True).mean(3, keep_dims=True)
+        mean_ = ops.cat([img0, img1], 2).mean(1, keepdim=True).mean(2, keepdim=True).mean(3, keepdim=True)
 
         img0 = img0 - mean_
         img1 = img1 - mean_
         img0_ = resize(img0, scale_factor) if scale_factor != 1.0 else img0
         img1_ = resize(img1, scale_factor) if scale_factor != 1.0 else img1
         b, _, h, w = img0_.shape
-        # coord = coords_grid(b, h // 8, w // 8, img0.device)
-        coord = coords_grid(b, h // 8, w // 8)
-
+        coord = coords_grid(b, h // 8, w // 8, img0.device)
         
         fmap0, fmap1 = self.feat_encoder([img0_, img1_]) # [1, 128, H//8, W//8]
         corr_fn = BidirCorrBlock(fmap0, fmap1, radius=self.radius, num_levels=self.corr_levels)
@@ -118,7 +113,6 @@ class Model(nn.Cell):
         delta_ft_3_, delta_flow_4 = self.update4(ft_3_, flow_4, corr_4)
         # delta_flow0_4, delta_flow1_4 = torch.chunk(delta_flow_4, 2, 1)
         delta_flow0_4, delta_flow1_4 = ops.chunk(delta_flow_4, 2, 1)
-
         up_flow0_4 = up_flow0_4 + delta_flow0_4
         up_flow1_4 = up_flow1_4 + delta_flow1_4
         ft_3_ = ft_3_ + delta_ft_3_
@@ -130,22 +124,13 @@ class Model(nn.Cell):
                                                  embt, downsample=2)
 
         # residue update with lookup corr
-        delta_ft_2_, delta_flow_3 = self.update3_low(ft_2_, flow_3, corr_3)
+        delta_ft_2_, delta_flow_3 = self.update3(ft_2_, flow_3, corr_3)
         # delta_flow0_3, delta_flow1_3 = torch.chunk(delta_flow_3, 2, 1)
         delta_flow0_3, delta_flow1_3 = ops.chunk(delta_flow_3, 2, 1)
         up_flow0_3 = up_flow0_3 + delta_flow0_3
         up_flow1_3 = up_flow1_3 + delta_flow1_3
         ft_2_ = ft_2_ + delta_ft_2_
-        
-        # residue update with lookup corr (hr)
-        corr_3 = resize(corr_3, scale_factor=2.0)
-        # up_flow_3 = torch.cat([up_flow0_3, up_flow1_3], dim=1)
-        up_flow_3 = ops.cat([up_flow0_3, up_flow1_3], axis=1)
-        delta_ft_2_, delta_up_flow_3 = self.update3_high(ft_2_, up_flow_3, corr_3)
-        ft_2_ += delta_ft_2_
-        up_flow0_3 += delta_up_flow_3[:, 0:2]
-        up_flow1_3 += delta_up_flow_3[:, 2:4]
-        
+
         ######################################### the 2nd decoder #########################################
         up_flow0_2, up_flow1_2, ft_1_  = self.decoder2(ft_2_, f0_2, f1_2, up_flow0_3, up_flow1_3)
         corr_2, flow_2 = self._corr_scale_lookup(corr_fn, 
@@ -153,22 +138,13 @@ class Model(nn.Cell):
                                                  embt, downsample=4)
         
         # residue update with lookup corr
-        delta_ft_1_, delta_flow_2 = self.update2_low(ft_1_, flow_2, corr_2)
+        delta_ft_1_, delta_flow_2 = self.update2(ft_1_, flow_2, corr_2)
         # delta_flow0_2, delta_flow1_2 = torch.chunk(delta_flow_2, 2, 1)
         delta_flow0_2, delta_flow1_2 = ops.chunk(delta_flow_2, 2, 1)
         up_flow0_2 = up_flow0_2 + delta_flow0_2
         up_flow1_2 = up_flow1_2 + delta_flow1_2
         ft_1_ = ft_1_ + delta_ft_1_
-        
-        # residue update with lookup corr (hr)
-        corr_2 = resize(corr_2, scale_factor=4.0)
-        # up_flow_2 = torch.cat([up_flow0_2, up_flow1_2], dim=1)
-        up_flow_2 = ops.cat([up_flow0_2, up_flow1_2], axis=1)
-        delta_ft_1_, delta_up_flow_2 = self.update2_high(ft_1_, up_flow_2, corr_2)
-        ft_1_ += delta_ft_1_
-        up_flow0_2 += delta_up_flow_2[:, 0:2]
-        up_flow1_2 += delta_up_flow_2[:, 2:4]
-        
+
         ######################################### the 1st decoder #########################################
         up_flow0_1, up_flow1_1, mask, img_res = self.decoder1(ft_1_, f0_1, f1_1, up_flow0_2, up_flow1_2)
         
@@ -184,7 +160,6 @@ class Model(nn.Cell):
         # imgt_pred = torch.clamp(imgt_pred, 0, 1)
         imgt_pred = ops.clamp(imgt_pred, 0, 1)
 
-
         if eval:
             return  { 'imgt_pred': imgt_pred, }
         else:
@@ -196,3 +171,4 @@ class Model(nn.Cell):
                 'flow1_pred': [up_flow1_1, up_flow1_2, up_flow1_3, up_flow1_4],
                 'ft_pred': [ft_1_, ft_2_, ft_3_],
             }
+    

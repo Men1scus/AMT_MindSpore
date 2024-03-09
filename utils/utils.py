@@ -2,6 +2,7 @@ import re
 import sys
 # import torch
 import mindspore as ms
+from mindspore import Tensor
 import random
 import numpy as np
 from PIL import ImageFile
@@ -88,12 +89,31 @@ def img2tensor(img):
     return ms.tensor(img).permute(2, 0, 1).unsqueeze(0) / 255.0
 
 
+# def tensor2img(img_t):
+#     # return (img_t * 255.).detach(
+#     #                     ).squeeze(0).permute(1, 2, 0).cpu().numpy(
+#     #                     ).clip(0, 255).astype(np.uint8)
+#     return (img_t * 255.).squeeze(0).permute(1, 2, 0).numpy(
+#                         ).clip(0, 255).astype(np.uint8)
+
 def tensor2img(img_t):
-    # return (img_t * 255.).detach(
-    #                     ).squeeze(0).permute(1, 2, 0).cpu().numpy(
-    #                     ).clip(0, 255).astype(np.uint8)
-    return (img_t * 255.).squeeze(0).permute(1, 2, 0).numpy(
-                        ).clip(0, 255).astype(np.uint8)
+    # 转置MindSpore张量以匹配[H, W, C]的期望形状
+    if img_t.ndim == 3:  # 形状[C, H, W]
+        transpose_op = ops.Transpose()
+        img_t = transpose_op(img_t, (1, 2, 0))
+    elif img_t.ndim == 4 and img_t.shape[0] == 1:  # 形状[1, C, H, W]
+        img_t = img_t.squeeze(0)
+        transpose_op = ops.Transpose()
+        img_t = transpose_op(img_t, (1, 2, 0))
+    else:
+        raise ValueError("图像维度不符合预期。")
+
+    # 确保图像值在合适的范围内
+    img_np = img_t.asnumpy() * 255.0
+    img_np = img_np.clip(0, 255).astype(np.uint8)
+
+    return img_np
+
 
 def seed_all(seed):
     random.seed(seed)
