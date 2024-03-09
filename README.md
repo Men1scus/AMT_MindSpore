@@ -59,3 +59,57 @@
  + Note: Please enable `--save_images` for saving the output images (Save speed will be slowed down if there are too many output images)
  + Input type supported: `a video` / `a regular expression` / `multiple images` / `a folder containing input frames`.
  + Results are in the `[OUT_PATH]` (default is `results/2x`) folder.
+
+ ## Pretrained Models
+> These pretrained models, presented in the `.ckpt` format, originated from transforming a `.pth` file.
+<p id="Pretrained"></p>
+
+<table>
+<thead>
+  <tr>
+    <th> Dataset </th>
+    <th> :link: Download Links </th>
+    <th> Config file </th>
+    <th> Trained on </th>
+    <th> Arbitrary/Fixed </th>
+  </tr>
+</thead>
+<tbody>
+  <tr>
+    <td>AMT-S</td>
+    <th>
+    [<a href="https://pan.baidu.com/s/1SvJ1xcFj2RNnI9O4rmo2sw?pwd=u4st">Baidu Cloud</a>] 
+    [<a href="https://drive.google.com/file/d/18vlxqeHdYECdvPB-JhsM4KfjvffVVOkm/view?usp=drive_link">Google Driver</a>]</th>
+    <th> [<a href="cfgs/AMT-S.yaml">cfgs/AMT-S</a>] </th>
+    <th>Vimeo90k</th>
+    <th>Fixed</th>
+  </tr>
+  <tr>
+    <td>AMT-L</td>
+    <th>
+    [<a href="https://pan.baidu.com/s/1RVm5i_XIaizGHaoXzoqVhg?pwd=xh0e">Baidu Cloud</a>]
+    [<a href="https://drive.google.com/file/d/1eFDU5QSeBuQ0ker_5lvLLBc8-jhBohIx/view?usp=drive_link">Google Driver</a>]</th>
+    <th> [<a href="cfgs/AMT-L.yaml">cfgs/AMT-L</a>] </th>
+    <th>Vimeo90k</th>
+    <th>Fixed</th>
+  </tr>
+  <tr>
+    <td>AMT-G</td>
+    <th>
+    [<a href="https://pan.baidu.com/s/1UjeSuqwjI1YyrBoG8XeQgg?pwd=4epu">Baidu Cloud</a>]
+    [<a href="https://drive.google.com/file/d/1mAsI084EzbH5s0iP47xHUmbKHmwIsicu/view?usp=drive_link">Google Driver</a>]</th>
+    <th> [<a href="cfgs/AMT-G.yaml">cfgs/AMT-G</a>] </th>
+    <th>Vimeo90k</th>
+    <th>Fixed</th>
+  </tr>
+  <tr>
+    <td>AMT-S</td>
+    <th>
+    [<a>Baidu Cloud(TBD)</a>] 
+    [<a>Google Driver(TBD)</a>]</th> </th>
+    <th> [<a href="cfgs/AMT-S_gopro.yaml">cfgs/AMT-S_gopro</a>] </th>
+    <th>GoPro</th>
+    <th>Arbitrary</th>
+  </tr>
+</tbody>
+</table>
